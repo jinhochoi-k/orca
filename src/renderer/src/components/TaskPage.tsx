@@ -2680,6 +2680,7 @@ export default function TaskPage(): React.JSX.Element {
   const jiraFilters: TaskPageJiraFiltersProps = {
     jiraPresets,
     jiraSearchInput,
+    appliedJiraSearch,
     activeJiraPreset,
     setJiraSearchInput,
     setAppliedJiraSearch,

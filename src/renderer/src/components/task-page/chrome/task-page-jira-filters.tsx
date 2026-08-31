@@ -12,10 +12,12 @@ import { cn } from '@/lib/utils'
 import type { JiraProject } from '../../../../../shared/jira-types'
 import type { TaskResumeState } from '../../../../../shared/ui-chrome-types'
 import type { JiraPreset } from '@/components/task-page-localized-options'
+import { TaskPageJiraSavedFilters } from './task-page-jira-saved-filters'
 
 export type TaskPageJiraFiltersProps = {
   jiraPresets: JiraPreset[]
   jiraSearchInput: string
+  appliedJiraSearch: string
   activeJiraPreset: JiraPreset['id']
   setJiraSearchInput: (value: string) => void
   setAppliedJiraSearch: (value: string) => void
@@ -37,6 +39,7 @@ export type TaskPageJiraFiltersProps = {
 export function TaskPageJiraFilters({
   jiraPresets,
   jiraSearchInput,
+  appliedJiraSearch,
   activeJiraPreset,
   setJiraSearchInput,
   setAppliedJiraSearch,
@@ -82,6 +85,16 @@ export function TaskPageJiraFilters({
               </button>
             )
           })}
+          <TaskPageJiraSavedFilters
+            jiraSearchInput={jiraSearchInput}
+            appliedJiraSearch={appliedJiraSearch}
+            applyJql={(jql) => {
+              setJiraSearchInput(jql)
+              setAppliedJiraSearch(jql)
+              setTaskResumeState({ jiraQuery: jql })
+              setJiraRefreshNonce((n) => n + 1)
+            }}
+          />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip>
