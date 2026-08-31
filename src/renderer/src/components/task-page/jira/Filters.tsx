@@ -8,6 +8,7 @@ import { translate } from '@/i18n/i18n'
 import { LoaderCircle, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { shouldSuppressEnterSubmit } from '@/lib/new-workspace-enter-guard'
+import { TaskPageJiraSavedFilters } from './TaskPageJiraSavedFilters'
 export function TaskPageJiraFilters({
   model
 }: {
@@ -18,6 +19,7 @@ export function TaskPageJiraFilters({
     jiraPresets,
     jiraLoading,
     jiraSearchInput,
+    appliedJiraSearch,
     setJiraSearchInput,
     setAppliedJiraSearch,
     activeJiraPreset,
@@ -64,6 +66,16 @@ export function TaskPageJiraFilters({
               </button>
             )
           })}
+          <TaskPageJiraSavedFilters
+            jiraSearchInput={jiraSearchInput}
+            appliedJiraSearch={appliedJiraSearch}
+            applyJql={(jql) => {
+              setJiraSearchInput(jql)
+              setAppliedJiraSearch(jql)
+              setTaskResumeState({ jiraQuery: jql })
+              setJiraRefreshNonce((n) => n + 1)
+            }}
+          />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip>
