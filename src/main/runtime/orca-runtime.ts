@@ -24174,6 +24174,7 @@ export class OrcaRuntimeService {
         | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
         | 'projectGroupOrder'
+        | 'perforceSubmitDisabled'
       >
     > & {
       externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
