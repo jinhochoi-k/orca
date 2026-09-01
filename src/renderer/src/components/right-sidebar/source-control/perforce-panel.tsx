@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { PerforceFileEntry, PerforceStatusResult } from '../../../../../shared/perforce-types'
+import type { Repo } from '../../../../../shared/repo-types'
+import { PerforceSubmitPolicyControl } from './perforce-submit-policy-control'
 
 const EMPTY_STATUS: PerforceStatusResult = { entries: [] }
 
@@ -19,13 +21,20 @@ function statusLabel(entry: PerforceFileEntry): string {
         : 'M'
 }
 
-export function PerforceSourceControlPanel({ worktreePath }: { worktreePath: string }) {
+export function PerforceSourceControlPanel({
+  repo,
+  worktreePath
+}: {
+  repo: Repo
+  worktreePath: string
+}) {
   const [status, setStatus] = useState<PerforceStatusResult>(EMPTY_STATUS)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mutation, setMutation] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [diff, setDiff] = useState<{ path: string; content: string } | null>(null)
+  const submitDisabled = repo.perforceSubmitDisabled === true
 
   const refresh = useCallback(
     async (includeUnopened = false) => {
@@ -235,6 +244,7 @@ export function PerforceSourceControlPanel({ worktreePath }: { worktreePath: str
       </div>
 
       <div className="shrink-0 space-y-2 border-t border-border p-2">
+        <PerforceSubmitPolicyControl repo={repo} />
         <Textarea
           value={message}
           onChange={(event) => setMessage(event.target.value)}
@@ -244,7 +254,10 @@ export function PerforceSourceControlPanel({ worktreePath }: { worktreePath: str
         <div className="grid grid-cols-2 gap-2">
           <Button
             size="sm"
-            disabled={!message.trim() || groups.opened.length === 0 || mutation !== null}
+            disabled={
+              submitDisabled || !message.trim() || groups.opened.length === 0 || mutation !== null
+            }
+            title={submitDisabled ? 'Submit is disabled for this project' : 'Submit changelist'}
             onClick={() => void runSubmission('submit')}
           >
             {mutation === 'submit' && <Loader2 className="size-3.5 animate-spin" />}

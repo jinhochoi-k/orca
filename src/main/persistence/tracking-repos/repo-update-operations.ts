@@ -63,6 +63,7 @@ export class RepoUpdatePersistenceOperations {
         | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
         | 'projectGroupOrder'
+        | 'perforceSubmitDisabled'
         | 'projectHostSetupMethod'
       >
     > & {

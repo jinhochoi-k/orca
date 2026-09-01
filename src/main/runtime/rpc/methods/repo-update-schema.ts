@@ -70,6 +70,7 @@ export function createRepoUpdateSchema<T extends z.ZodRawShape>(
       externalWorktreeDiscoverySuppressedAt: z.number().finite().nullable().optional(),
       projectGroupId: OptionalString.nullable().optional(),
       projectGroupOrder: OptionalFiniteNumber,
+      perforceSubmitDisabled: z.boolean().optional(),
       sourceControlAi: RepoSourceControlAiOverrides
     })
   }) as z.ZodObject<T & { updates: z.ZodObject<z.ZodRawShape> }>
