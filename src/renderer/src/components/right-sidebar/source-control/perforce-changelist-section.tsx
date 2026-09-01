@@ -94,6 +94,7 @@ export function PerforceChangelistSection({
   onShelvedDiff: (entry: PerforceShelvedFile) => void
 }) {
   const [open, setOpen] = useState(changelist.files.length > 0 || changelist.id === 'default')
+  const [shelvedOpen, setShelvedOpen] = useState(true)
   const title = changelist.id === 'default' ? 'Default changelist' : `CL ${changelist.id}`
 
   return (
@@ -146,29 +147,42 @@ export function PerforceChangelistSection({
                 )}
                 View shelved files
               </Button>
-            ) : shelvedFiles.length === 0 ? (
-              <p className="px-8 py-2 text-[11px] text-muted-foreground">No shelved files</p>
             ) : (
-              <section>
-                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Shelved files
-                </div>
-                {shelvedFiles.map((entry) => (
-                  <button
-                    key={entry.depotPath}
-                    type="button"
-                    className="flex min-h-8 w-full items-center gap-2 border-t border-border/40 px-3 text-left text-xs hover:bg-accent"
-                    onClick={() => onShelvedDiff(entry)}
-                  >
-                    <span className="w-4 font-mono font-semibold text-muted-foreground">
-                      {statusLabel(entry.status)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-mono" title={entry.depotPath}>
-                      {entry.depotPath}
-                    </span>
-                  </button>
-                ))}
-              </section>
+              <Collapsible open={shelvedOpen} onOpenChange={setShelvedOpen}>
+                <CollapsibleTrigger className="flex h-7 w-full items-center gap-2 px-3 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-accent">
+                  <ChevronDown
+                    className={cn(
+                      'size-3 shrink-0 transition-transform',
+                      !shelvedOpen && '-rotate-90'
+                    )}
+                  />
+                  <span className="flex-1">Shelved files</span>
+                  <span className="tabular-nums">{shelvedFiles.length}</span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  {shelvedFiles.length === 0 ? (
+                    <p className="border-t border-border/40 px-8 py-2 text-[11px] text-muted-foreground">
+                      No shelved files
+                    </p>
+                  ) : (
+                    shelvedFiles.map((entry) => (
+                      <button
+                        key={entry.depotPath}
+                        type="button"
+                        className="flex min-h-8 w-full items-center gap-2 border-t border-border/40 px-3 text-left text-xs hover:bg-accent"
+                        onClick={() => onShelvedDiff(entry)}
+                      >
+                        <span className="w-4 font-mono font-semibold text-muted-foreground">
+                          {statusLabel(entry.status)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-mono" title={entry.depotPath}>
+                          {entry.depotPath}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
             )}
           </div>
         ) : null}
