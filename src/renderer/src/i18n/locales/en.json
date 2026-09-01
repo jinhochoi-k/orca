@@ -7835,7 +7835,8 @@
           "show": "Show",
           "hide": "Hide",
           "externalWorktreesGlobal": "Global default: {{value0}}",
-          "useGlobal": "Use global"
+          "useGlobal": "Use global",
+          "setupKindPerforce": "Perforce workspace"
         },
         "RepositorySourceControlAiActionRows": {
           "548a6e1281": "Command template",
@@ -14932,6 +14933,10 @@
           "a0af0198aa": "Large diffs are not rendered by default.",
           "c3d9f4a712": "This diff's size isn't known yet, so it loads on request.",
           "f7fa7a40d0": "Load diff"
+        },
+        "EditorDiffFileSurface": {
+          "unrealAssetChanged": "Unreal asset changed",
+          "unrealAssetDiffUnavailable": "Unreal asset files are binary, so Orca cannot display a text diff. Open the file in Unreal Editor or a configured asset diff tool to compare it."
         }
       },
       "diff": {

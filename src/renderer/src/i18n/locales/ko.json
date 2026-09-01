@@ -6728,6 +6728,7 @@
           "cloneDestinationPlaceholder": "/destination/on/host",
           "setupKindGit": "Git 리포지토리",
           "setupKindFolder": "폴더",
+          "setupKindPerforce": "Perforce 워크스페이스",
           "settingUpHost": "가져오는 중...",
           "setupHost": "가져오기",
           "cloningHost": "클론 중...",
@@ -12770,6 +12771,10 @@
         }
       },
       "editor": {
+        "EditorDiffFileSurface": {
+          "unrealAssetChanged": "Unreal 에셋이 변경되었습니다",
+          "unrealAssetDiffUnavailable": "Unreal 에셋 파일은 바이너리 형식이므로 Orca에서 텍스트 diff를 표시할 수 없습니다. 비교하려면 Unreal Editor 또는 설정된 에셋 diff 도구에서 파일을 여세요."
+        },
         "ChangesModeView": {
           "ef25ae2d09": "commit 되지 않은 변경 사항이 없습니다.",
           "052c184f24": "이 파일에는 텍스트 비교를 사용할 수 없습니다.",

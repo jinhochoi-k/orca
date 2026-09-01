@@ -6,6 +6,8 @@ describe('hasBinaryFileExtension', () => {
     expect(hasBinaryFileExtension('docs/Shot.PNG')).toBe(true)
     expect(hasBinaryFileExtension('vendor/lib.tar.gz')).toBe(true)
     expect(hasBinaryFileExtension('C:\\assets\\theme.woff2')).toBe(true)
+    expect(hasBinaryFileExtension('//depot/game/Character.uasset')).toBe(true)
+    expect(hasBinaryFileExtension('//depot/game/Arena.umap')).toBe(true)
   })
 
   it('treats svg as text because the diff view renders its source', () => {
