@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Download, FilePlus2, RefreshCw, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type {
   PerforceChangelistsResult,
@@ -12,6 +11,7 @@ import type {
 import type { Repo } from '../../../../../shared/repo-types'
 import { PerforceChangelistSection, PerforceLocalChanges } from './perforce-changelist-section'
 import { PerforceCreateChangelistDialog } from './perforce-create-changelist-dialog'
+import { PerforceDiffDialog, type PerforceDiff } from './perforce-diff-dialog'
 import { PerforceToolbarMenu } from './perforce-toolbar-menu'
 
 const EMPTY_CHANGESETS: PerforceChangelistsResult = { changelists: [], localChanges: [] }
@@ -27,7 +27,7 @@ export function PerforceSourceControlPanel({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mutation, setMutation] = useState<string | null>(null)
-  const [diff, setDiff] = useState<{ path: string; content: string } | null>(null)
+  const [diff, setDiff] = useState<PerforceDiff | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [shelvedByChange, setShelvedByChange] = useState<Record<string, PerforceShelvedFile[]>>({})
 
@@ -147,8 +147,9 @@ export function PerforceSourceControlPanel({
           depotPath: entry.depotPath
         })
         setDiff({
-          path: `${entry.depotPath} (shelved in CL ${changelist})`,
-          content: content || 'No textual diff is available.'
+          path: entry.depotPath,
+          content: content || 'No textual diff is available.',
+          shelvedChangelist: changelist
         })
       } catch (caught) {
         toast.error('Failed to load shelved diff', {
@@ -251,16 +252,7 @@ export function PerforceSourceControlPanel({
         onOpenChange={setCreateOpen}
         onCreate={(description) => void createChangelist(description)}
       />
-      <Dialog open={diff !== null} onOpenChange={(open) => !open && setDiff(null)}>
-        <DialogContent className="flex max-h-[80vh] max-w-4xl flex-col">
-          <DialogHeader>
-            <DialogTitle className="truncate font-mono text-sm">{diff?.path}</DialogTitle>
-          </DialogHeader>
-          <pre className="scrollbar-sleek min-h-0 overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs leading-5">
-            {diff?.content}
-          </pre>
-        </DialogContent>
-      </Dialog>
+      <PerforceDiffDialog diff={diff} onOpenChange={(open) => !open && setDiff(null)} />
     </div>
   )
 }

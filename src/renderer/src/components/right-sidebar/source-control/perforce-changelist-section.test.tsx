@@ -56,6 +56,7 @@ describe('PerforceChangelistSection', () => {
 
     expect(html).toContain('Shelved files')
     expect(html).toContain('//PUBG/mainline/Tsl/Feature.cpp')
+    expect(html).toContain('data-state="open"')
   })
 })
 
