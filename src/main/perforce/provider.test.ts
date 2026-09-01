@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PerforceProvider, parseP4TaggedOutput, type PerforceRun } from './provider'
+import {
+  extractShelvedFileDiff,
+  PerforceProvider,
+  parseP4TaggedOutput,
+  type PerforceRun
+} from './provider'
 
 function result(stdout = '', code = 0, stderr = '') {
   return { code, stdout, stderr }
@@ -30,6 +35,23 @@ describe('parseP4TaggedOutput', () => {
         action: 'add'
       }
     ])
+  })
+})
+
+describe('extractShelvedFileDiff', () => {
+  it('returns only the requested depot file section', () => {
+    const output = [
+      'Change 123 by user@client on 2026/09/01',
+      '==== //depot/main/a.ts#1 - //depot/main/a.ts@=123 (text) ====',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+      '==== //depot/main/b.ts#2 - //depot/main/b.ts@=123 (text) ====',
+      '@@ -1 +1 @@'
+    ].join('\n')
+
+    expect(extractShelvedFileDiff(output, '//depot/main/a.ts')).toContain('+new')
+    expect(extractShelvedFileDiff(output, '//depot/main/a.ts')).not.toContain('b.ts')
   })
 })
 
@@ -116,6 +138,77 @@ describe('PerforceProvider', () => {
     await new PerforceProvider(run).open('C:\\work', 'new.ts')
 
     expect(run.mock.calls[1]?.[0]).toEqual(['add', 'C:\\work\\new.ts'])
+  })
+
+  it('groups open files under pending changelists', async () => {
+    const run = vi.fn<PerforceRun>(async (args) => {
+      const command = args.join(' ')
+      if (command === '-ztag info') {
+        return result('... userName jinho\n... clientName ws\n... clientRoot C:\\work')
+      }
+      if (command.startsWith('-ztag changes')) {
+        return result('... change 123\n... desc Feature work\n... user jinho\n... client ws')
+      }
+      if (command === '-ztag opened ...') {
+        return result(
+          [
+            '... depotFile //depot/main/default.ts',
+            '... clientFile C:\\work\\default.ts',
+            '... action edit',
+            '... change default',
+            '... depotFile //depot/main/feature.ts',
+            '... clientFile C:\\work\\feature.ts',
+            '... action edit',
+            '... change 123'
+          ].join('\n')
+        )
+      }
+      return result()
+    })
+
+    const changes = await new PerforceProvider(run).changelists('C:\\work')
+
+    expect(changes.changelists).toMatchObject([
+      { id: 'default', files: [{ path: 'default.ts' }] },
+      { id: '123', description: 'Feature work', files: [{ path: 'feature.ts' }] }
+    ])
+    expect(run.mock.calls.some(([args]) => args.includes('-m') && args.includes('100'))).toBe(true)
+  })
+
+  it('creates and moves files between numbered changelists', async () => {
+    const run = vi.fn<PerforceRun>(async (args) =>
+      args.join(' ') === 'change -i' ? result('Change 321 created.') : result()
+    )
+    const provider = new PerforceProvider(run)
+
+    await expect(provider.createPendingChangelist('C:\\work', 'Feature')).resolves.toEqual({
+      success: true,
+      changelist: '321'
+    })
+    await provider.moveFiles('C:\\work', '321', ['a.ts'])
+
+    expect(run).toHaveBeenLastCalledWith(['reopen', '-c', '321', 'C:\\work\\a.ts'], {
+      cwd: 'C:\\work'
+    })
+  })
+
+  it('loads shelved files and an individual shelved diff on demand', async () => {
+    const run = vi.fn<PerforceRun>(async (args) => {
+      if (args.join(' ') === '-ztag describe -S -s 123') {
+        return result('... depotFile0 //depot/main/a.ts\n... action0 edit\n... rev0 7')
+      }
+      return result(
+        '==== //depot/main/a.ts#7 - //depot/main/a.ts@=123 (text) ====\n@@ -1 +1 @@\n-old\n+new'
+      )
+    })
+    const provider = new PerforceProvider(run)
+
+    await expect(provider.shelvedFiles('C:\\work', '123')).resolves.toEqual([
+      { depotPath: '//depot/main/a.ts', status: 'modified', revision: '7' }
+    ])
+    await expect(provider.shelvedDiff('C:\\work', '123', '//depot/main/a.ts')).resolves.toContain(
+      '+new'
+    )
   })
 
   it('treats Perforce no-change messages as an empty status', async () => {

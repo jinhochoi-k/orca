@@ -1,25 +1,40 @@
-import { isAbsolute, relative, resolve } from 'node:path'
+import { relative } from 'node:path'
 import { runProcess } from '../../shared/child-process/run-process'
 import type {
+  PerforceChangelistsResult,
   PerforceFileEntry,
   PerforceInfoResult,
   PerforceMutationResult,
+  PerforceShelvedFile,
   PerforceStatusResult
 } from '../../shared/perforce-types'
+import {
+  createPendingPerforceChangelist,
+  createPerforceChangelist,
+  extractShelvedFileDiff,
+  listPerforceChangelists,
+  loadPerforceShelvedDiff,
+  loadPerforceShelvedFiles,
+  movePerforceFiles
+} from './changelist-operations'
+import {
+  isPathInsideOrEqual,
+  mapPerforceAction,
+  optionalPerforceStatusOutput,
+  parseP4TaggedOutput,
+  perforceErrorText,
+  requirePerforceWorkspacePath,
+  runPerforceChecked,
+  type PerforceRun,
+  type TaggedRecord
+} from './command'
+
+export { extractShelvedFileDiff, parseP4TaggedOutput }
+export type { PerforceRun }
 
 const P4_TIMEOUT_MS = 30_000
 const P4_STATUS_TIMEOUT_MS = 120_000
 const P4_SYNC_TIMEOUT_MS = 10 * 60_000
-
-type TaggedRecord = Record<string, string>
-export type PerforceRun = (
-  args: readonly string[],
-  options: { cwd: string; input?: string; timeoutMs?: number }
-) => Promise<{
-  code: number | null
-  stdout: string
-  stderr: string
-}>
 
 const defaultRun: PerforceRun = async (args, options) =>
   runProcess({
@@ -29,59 +44,6 @@ const defaultRun: PerforceRun = async (args, options) =>
     input: options.input,
     timeoutMs: options.timeoutMs ?? P4_TIMEOUT_MS
   })
-
-export function parseP4TaggedOutput(output: string): TaggedRecord[] {
-  const records: TaggedRecord[] = []
-  let current: TaggedRecord = {}
-  for (const line of output.split(/\r?\n/)) {
-    const match = /^\.\.\.\s+(\S+)\s?(.*)$/.exec(line)
-    if (!match) {
-      continue
-    }
-    const [, key, value] = match
-    if (key in current) {
-      records.push(current)
-      current = {}
-    }
-    current[key] = value
-  }
-  if (Object.keys(current).length > 0) {
-    records.push(current)
-  }
-  return records
-}
-
-function errorText(result: { stderr: string; stdout: string }): string {
-  return (result.stderr || result.stdout || 'Perforce command failed').trim()
-}
-
-function optionalStatusOutput(result: {
-  code: number | null
-  stdout: string
-  stderr: string
-}): string {
-  if (result.code === 0) {
-    return result.stdout
-  }
-  const message = errorText(result)
-  if (/file\(s\) not opened|no file\(s\) to reconcile|no files to reconcile/i.test(message)) {
-    return ''
-  }
-  throw new Error(message)
-}
-
-function mapAction(action: string): Pick<PerforceFileEntry, 'status' | 'area'> {
-  if (action.includes('add')) {
-    return { status: 'added', area: 'staged' }
-  }
-  if (action.includes('delete')) {
-    return { status: 'deleted', area: 'staged' }
-  }
-  if (action.includes('move')) {
-    return { status: 'renamed', area: 'staged' }
-  }
-  return { status: 'modified', area: 'staged' }
-}
 
 function entryFromRecord(
   record: TaggedRecord,
@@ -93,7 +55,7 @@ function entryFromRecord(
     return null
   }
   const path = relative(root, clientFile).replaceAll('\\', '/')
-  const mapped = mapAction(record.action || record.type || '')
+  const mapped = mapPerforceAction(record.action || record.type || '')
   return {
     path,
     status: mapped.status,
@@ -101,33 +63,6 @@ function entryFromRecord(
     ...(record.change ? { changelist: record.change } : {}),
     ...(record.depotFile ? { depotPath: record.depotFile } : {})
   }
-}
-
-function requireWorkspacePath(root: string, filePath: string): string {
-  const absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(root, filePath)
-  const child = relative(resolve(root), absolute)
-  if (child === '..' || child.startsWith(`..\\`) || child.startsWith('../') || isAbsolute(child)) {
-    throw new Error('Perforce file path is outside the workspace root')
-  }
-  return absolute
-}
-
-function isPathInsideOrEqual(root: string, candidate: string): boolean {
-  const child = relative(resolve(root), resolve(candidate))
-  return child === '' || (!child.startsWith('..') && !isAbsolute(child))
-}
-
-async function runChecked(
-  run: PerforceRun,
-  cwd: string,
-  args: readonly string[],
-  options: { input?: string; timeoutMs?: number } = {}
-): Promise<string> {
-  const result = await run(args, { cwd, ...options })
-  if (result.code !== 0) {
-    throw new Error(errorText(result))
-  }
-  return result.stdout
 }
 
 export class PerforceProvider {
@@ -145,7 +80,7 @@ export class PerforceProvider {
       }
     }
     if (result.code !== 0) {
-      return { available: true, isWorkspace: false, error: errorText(result) }
+      return { available: true, isWorkspace: false, error: perforceErrorText(result) }
     }
     const info = parseP4TaggedOutput(result.stdout)[0] ?? {}
     const client = info.clientName
@@ -168,9 +103,10 @@ export class PerforceProvider {
 
   async status(
     worktreePath: string,
-    options: { includeUnopened?: boolean } = {}
+    options: { includeUnopened?: boolean } = {},
+    knownInfo?: PerforceInfoResult
   ): Promise<PerforceStatusResult> {
-    const info = await this.info(worktreePath)
+    const info = knownInfo ?? (await this.info(worktreePath))
     if (!info.available || !info.isWorkspace) {
       throw new Error(info.error || 'Not a valid Perforce client workspace')
     }
@@ -183,8 +119,8 @@ export class PerforceProvider {
           })
         : Promise.resolve({ code: 0, stdout: '', stderr: '' })
     ])
-    const openedOutput = optionalStatusOutput(openedResult)
-    const reconcileOutput = optionalStatusOutput(reconcileResult)
+    const openedOutput = optionalPerforceStatusOutput(openedResult)
+    const reconcileOutput = optionalPerforceStatusOutput(reconcileResult)
     const opened = parseP4TaggedOutput(openedOutput)
       .map((record) => entryFromRecord(record, worktreePath, true))
       .filter((entry): entry is PerforceFileEntry => entry !== null)
@@ -203,14 +139,49 @@ export class PerforceProvider {
     }
   }
 
+  async changelists(
+    worktreePath: string,
+    options: { includeUnopened?: boolean } = {}
+  ): Promise<PerforceChangelistsResult> {
+    const info = await this.info(worktreePath)
+    if (!info.available || !info.isWorkspace || !info.client || !info.user) {
+      throw new Error(info.error || 'Not a valid Perforce client workspace')
+    }
+    return listPerforceChangelists(
+      this.run,
+      worktreePath,
+      info,
+      await this.status(worktreePath, options, info)
+    )
+  }
+
+  async createPendingChangelist(
+    worktreePath: string,
+    description: string
+  ): Promise<PerforceMutationResult> {
+    return createPendingPerforceChangelist(this.run, worktreePath, description)
+  }
+
+  async moveFiles(worktreePath: string, changelist: string, filePaths: string[]): Promise<void> {
+    await movePerforceFiles(this.run, worktreePath, changelist, filePaths)
+  }
+
+  async shelvedFiles(worktreePath: string, changelist: string): Promise<PerforceShelvedFile[]> {
+    return loadPerforceShelvedFiles(this.run, worktreePath, changelist)
+  }
+
+  async shelvedDiff(worktreePath: string, changelist: string, depotPath: string): Promise<string> {
+    return loadPerforceShelvedDiff(this.run, worktreePath, changelist, depotPath)
+  }
+
   async diff(worktreePath: string, filePath: string): Promise<string> {
-    const target = requireWorkspacePath(worktreePath, filePath)
-    return runChecked(this.run, worktreePath, ['diff', '-du', '-f', target])
+    const target = requirePerforceWorkspacePath(worktreePath, filePath)
+    return runPerforceChecked(this.run, worktreePath, ['diff', '-du', '-f', target])
   }
 
   async open(worktreePath: string, filePath: string): Promise<void> {
-    const target = requireWorkspacePath(worktreePath, filePath)
-    const preview = await runChecked(this.run, worktreePath, [
+    const target = requirePerforceWorkspacePath(worktreePath, filePath)
+    const preview = await runPerforceChecked(this.run, worktreePath, [
       '-ztag',
       'reconcile',
       '-n',
@@ -221,14 +192,14 @@ export class PerforceProvider {
     ])
     const action = parseP4TaggedOutput(preview)[0]?.action ?? 'edit'
     const command = action.includes('add') ? 'add' : action.includes('delete') ? 'delete' : 'edit'
-    await runChecked(this.run, worktreePath, [command, target])
+    await runPerforceChecked(this.run, worktreePath, [command, target])
   }
 
   async revert(worktreePath: string, filePath: string): Promise<void> {
-    await runChecked(this.run, worktreePath, [
+    await runPerforceChecked(this.run, worktreePath, [
       'revert',
       '-k',
-      requireWorkspacePath(worktreePath, filePath)
+      requirePerforceWorkspacePath(worktreePath, filePath)
     ])
   }
 
@@ -237,8 +208,8 @@ export class PerforceProvider {
     try {
       const targets = await this.defaultChangelistTargets(worktreePath)
       changelist = await this.createChangelist(worktreePath, message)
-      await runChecked(this.run, worktreePath, ['reopen', '-c', changelist, ...targets])
-      await runChecked(this.run, worktreePath, ['submit', '-c', changelist])
+      await runPerforceChecked(this.run, worktreePath, ['reopen', '-c', changelist, ...targets])
+      await runPerforceChecked(this.run, worktreePath, ['submit', '-c', changelist])
       return { success: true, changelist }
     } catch (error) {
       return {
@@ -254,8 +225,8 @@ export class PerforceProvider {
     try {
       const targets = await this.defaultChangelistTargets(worktreePath)
       changelist = await this.createChangelist(worktreePath, message)
-      await runChecked(this.run, worktreePath, ['reopen', '-c', changelist, ...targets])
-      await runChecked(this.run, worktreePath, ['shelve', '-c', changelist])
+      await runPerforceChecked(this.run, worktreePath, ['reopen', '-c', changelist, ...targets])
+      await runPerforceChecked(this.run, worktreePath, ['shelve', '-c', changelist])
       return { success: true, changelist }
     } catch (error) {
       return {
@@ -267,15 +238,17 @@ export class PerforceProvider {
   }
 
   async sync(worktreePath: string): Promise<void> {
-    await runChecked(this.run, worktreePath, ['sync'], { timeoutMs: P4_SYNC_TIMEOUT_MS })
+    await runPerforceChecked(this.run, worktreePath, ['sync'], { timeoutMs: P4_SYNC_TIMEOUT_MS })
   }
 
   private async defaultChangelistTargets(worktreePath: string): Promise<string[]> {
     const openedResult = await this.run(['-ztag', 'opened', '...'], { cwd: worktreePath })
-    const records = parseP4TaggedOutput(optionalStatusOutput(openedResult)).filter((record) => {
-      const clientFile = record.clientFile
-      return clientFile && isPathInsideOrEqual(worktreePath, clientFile)
-    })
+    const records = parseP4TaggedOutput(optionalPerforceStatusOutput(openedResult)).filter(
+      (record) => {
+        const clientFile = record.clientFile
+        return clientFile && isPathInsideOrEqual(worktreePath, clientFile)
+      }
+    )
     if (records.some((record) => record.change && record.change !== 'default')) {
       throw new Error(
         'Some project files are already in numbered changelists. Submit or shelve those changelists separately.'
@@ -291,12 +264,6 @@ export class PerforceProvider {
   }
 
   private async createChangelist(worktreePath: string, message: string): Promise<string> {
-    const spec = `Change: new\n\nDescription:\n\t${message.trim().replaceAll('\n', '\n\t')}\n`
-    const created = await runChecked(this.run, worktreePath, ['change', '-i'], { input: spec })
-    const changelist = /Change\s+(\d+)\s+created/i.exec(created)?.[1]
-    if (!changelist) {
-      throw new Error(`Could not read created changelist from: ${created.trim()}`)
-    }
-    return changelist
+    return createPerforceChangelist(this.run, worktreePath, message)
   }
 }
