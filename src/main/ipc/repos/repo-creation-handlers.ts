@@ -5,7 +5,7 @@ import { access, mkdir, readdir, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import type { Store } from '../../persistence'
-import type { Repo } from '../../../shared/repo-types'
+import type { Repo, RepoKind } from '../../../shared/repo-types'
 import { DEFAULT_REPO_BADGE_COLOR, getDefaultWorkspaceDir } from '../../../shared/constants'
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
@@ -70,7 +70,7 @@ export function registerRepoCreationHandlers(mainWindow: BrowserWindow, store: S
     'repos:add',
     async (
       _event,
-      args: { path: string; kind?: 'git' | 'folder'; displayName?: string }
+      args: { path: string; kind?: RepoKind; displayName?: string }
     ): Promise<{ repo: Repo } | { error: string }> => {
       const result = await addLocalRepoFromPath(store, args.path, args.kind, args.displayName)
       if ('error' in result) {

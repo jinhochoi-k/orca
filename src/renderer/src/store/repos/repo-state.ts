@@ -19,7 +19,7 @@ import type {
   ProjectHostSetupUpdateResult,
   ProjectUpdateArgs
 } from '../../../../shared/project-types'
-import type { Repo } from '../../../../shared/repo-types'
+import type { Repo, RepoKind } from '../../../../shared/repo-types'
 import type {
   FolderWorkspacePathStatus,
   FolderWorkspacePathStatusRequest
@@ -159,11 +159,7 @@ export type RepoSlice = {
   fetchFolderWorkspaces: (options?: RuntimeCatalogFetchOptions) => Promise<void>
   fetchFolderWorkspacesForAllHosts: (options?: AllHostCatalogFetchOptions) => Promise<void>
   addRepo: () => Promise<Repo | null>
-  addRepoPath: (
-    path: string,
-    kind?: 'git' | 'folder',
-    options?: AddRepoPathOptions
-  ) => Promise<Repo | null>
+  addRepoPath: (path: string, kind?: RepoKind, options?: AddRepoPathOptions) => Promise<Repo | null>
   setupProjectExistingFolder: (
     args: ProjectHostSetupExistingFolderArgs
   ) => Promise<ProjectHostSetupResult | null>

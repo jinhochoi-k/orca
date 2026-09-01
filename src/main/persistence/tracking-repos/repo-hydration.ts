@@ -1,7 +1,7 @@
 import type { Repo } from '../../../shared/repo-types'
 import { getRepoExecutionHostId } from '../../../shared/execution-host'
 import { getDefaultRepoHookSettings } from '../../../shared/constants'
-import { isFolderRepo } from '../../../shared/repo-kind'
+import { getRepoKind, isFolderRepo } from '../../../shared/repo-kind'
 import { sanitizeRepoIcon } from '../../../shared/repo-icon'
 import { normalizeRepoSourceControlAiOverrides } from '../../../shared/source-control-ai'
 import {
@@ -67,7 +67,7 @@ export function hydrateRepo(repo: Repo, gitUsernameCache: ReadonlyMap<string, st
     ...(worktreeVisibilitySourcePreferences !== undefined
       ? { worktreeVisibilitySourcePreferences }
       : {}),
-    kind: isFolderRepo(repo) ? 'folder' : 'git',
+    kind: getRepoKind(repo),
     gitUsername,
     hookSettings: {
       ...getDefaultRepoHookSettings(),

@@ -152,12 +152,14 @@ export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, stor
         parsedHost.kind === 'local'
           ? await addLocalRepoFromPath(store, args.path, args.kind)
           : parsedHost.kind === 'ssh'
-            ? await addRemoteRepoFromPath(store, {
-                connectionId: parsedHost.targetId,
-                remotePath: args.path,
-                displayName: args.displayName,
-                kind: args.kind
-              })
+            ? args.kind === 'perforce'
+              ? { error: 'Perforce projects over SSH are not supported yet.' }
+              : await addRemoteRepoFromPath(store, {
+                  connectionId: parsedHost.targetId,
+                  remotePath: args.path,
+                  displayName: args.displayName,
+                  kind: args.kind
+                })
             : {
                 error:
                   'Runtime hosts must be set up through the runtime projectHostSetup.setupExistingFolder RPC.'

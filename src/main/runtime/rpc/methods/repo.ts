@@ -15,7 +15,7 @@ const RepoSelector = z.object({
 
 const RepoPath = z.object({
   path: requiredString('Missing repo path'),
-  kind: z.enum(['git', 'folder']).optional(),
+  kind: z.enum(['git', 'perforce', 'folder']).optional(),
   displayName: OptionalString
 })
 

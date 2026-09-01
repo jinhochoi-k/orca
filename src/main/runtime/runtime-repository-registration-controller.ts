@@ -3,11 +3,12 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../shared/constants'
 import { parseExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
-import type { Repo } from '../../shared/repo-types'
+import type { Repo, RepoKind } from '../../shared/repo-types'
 import { gitExecFileAsync, awaitWindowsHostGitEnvironmentReady } from '../git/runner'
 import { getRepoName, isGitRepo } from '../git/repo'
 import { invalidateAuthorizedRootsCache, isENOENT } from '../ipc/filesystem-auth'
 import { detectRepoIconAndUpstream } from '../repo-icon-autodetect'
+import { PerforceProvider } from '../perforce/provider'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 import type { RuntimeStore } from './runtime-store-contract'
 import { runtimePathsEqual } from './runtime-worktree-path-identity'
@@ -25,7 +26,7 @@ export class RuntimeRepositoryRegistrationController {
 
   async add(
     path: string,
-    kind: 'git' | 'folder' = 'git',
+    kind: RepoKind = 'git',
     executionHostId?: ExecutionHostId | null,
     displayName?: string
   ): Promise<Repo> {
@@ -38,6 +39,12 @@ export class RuntimeRepositoryRegistrationController {
     }
     if (kind === 'git' && !isGitRepo(path)) {
       throw new Error(`Not a valid git repository: ${path}`)
+    }
+    if (kind === 'perforce') {
+      const info = await new PerforceProvider().info(path)
+      if (!info.available || !info.isWorkspace) {
+        throw new Error(info.error || `Not a valid Perforce client workspace: ${path}`)
+      }
     }
     const existing = store.getRepos().find((repo) => {
       return (

@@ -2,7 +2,7 @@ import type { StateCreator } from 'zustand'
 import { toast } from 'sonner'
 import type { AppState } from '../types'
 import type { Repo } from '../../../../shared/repo-types'
-import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { hasSourceControl } from '../../../../shared/repo-kind'
 import { getRepoHostIdentity } from '../slices/repo-host-identity'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { buildDismissedOnboardingFolderAgentStartup } from '@/lib/onboarding-folder-agent-startup'
@@ -62,7 +62,28 @@ export function createRepoAddActions(
           if (kind !== 'git' || !message.includes('Not a valid git repository')) {
             throw err
           }
-          if (target.kind !== 'local') {
+          if (target.kind === 'local') {
+            const perforceInfo = await window.api.perforce.info({ worktreePath: path })
+            if (perforceInfo.available && perforceInfo.isWorkspace) {
+              const perforceResult = await window.api.repos.add({
+                path,
+                kind: 'perforce',
+                ...(displayName ? { displayName } : {})
+              })
+              if ('error' in perforceResult) {
+                throw new Error(perforceResult.error)
+              }
+              repo = perforceResult.repo
+              // Continue through the common catalog/upsert path below.
+            } else {
+              const { openModal } = get()
+              openModal('confirm-non-git-folder', {
+                folderPath: path,
+                ...(displayName ? { displayName } : {})
+              })
+              return null
+            }
+          } else {
             const status = await fetchRuntimeAddProjectPathStatus({ target, path })
             if (status?.exists !== true) {
               const hostName = getRuntimeEnvironmentDisplayName(get(), target.environmentId)
@@ -82,15 +103,17 @@ export function createRepoAddActions(
               )
               return null
             }
+            // Why: folder mode is a capability downgrade (no worktrees/SCM/PRs/checks), so confirm via dialog rather than silently falling back.
+            const { openModal } = get()
+            openModal('confirm-non-git-folder', {
+              folderPath: path,
+              ...(displayName ? { displayName } : {}),
+              ...(target.kind === 'environment'
+                ? { runtimeEnvironmentId: target.environmentId }
+                : {})
+            })
+            return null
           }
-          // Why: folder mode is a capability downgrade (no worktrees/SCM/PRs/checks), so confirm via dialog rather than silently falling back.
-          const { openModal } = get()
-          openModal('confirm-non-git-folder', {
-            folderPath: path,
-            ...(displayName ? { displayName } : {}),
-            ...(target.kind === 'environment' ? { runtimeEnvironmentId: target.environmentId } : {})
-          })
-          return null
         }
         repo = repoWithFetchedOwner(repo, target)
         const repoIdentity = getRepoHostIdentity(repo)
@@ -120,7 +143,7 @@ export function createRepoAddActions(
           })
         } else {
           toast.success(
-            isGitRepoKind(repo)
+            hasSourceControl(repo)
               ? translate('auto.store.slices.repos.8bb3ad7935', 'Project added')
               : translate('auto.store.slices.repos.90d129b48b', 'Folder added'),
             {
