@@ -3,6 +3,7 @@ import type {
   PerforceInfoResult,
   PerforceMutationResult,
   PerforceShelvedFile,
+  PerforceShelvedFileContent,
   PerforceStatusResult
 } from '../../shared/perforce-types'
 
@@ -44,5 +45,10 @@ export type PerforceApi = {
     changelist: string
     depotPath: string
   }) => Promise<string>
+  shelvedFileContent: (args: {
+    worktreePath: string
+    changelist: string
+    file: PerforceShelvedFile
+  }) => Promise<PerforceShelvedFileContent>
   sync: (args: { worktreePath: string }) => Promise<void>
 }

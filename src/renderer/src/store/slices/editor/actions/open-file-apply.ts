@@ -108,11 +108,18 @@ export function applyOpenFileToState(
     )
       ? (existing.fileContentReloadNonce ?? 0) + 1
       : existing.fileContentReloadNonce
+    const diffContentReloadNonce =
+      options?.forceContentReload === true && existing.mode === 'diff'
+        ? (existing.diffContentReloadNonce ?? 0) + 1
+        : existing.diffContentReloadNonce
     const needsExistingUpdate =
       existing.mode !== file.mode ||
       existing.diffSource !== file.diffSource ||
       existing.branchCompare?.compareVersion !== file.branchCompare?.compareVersion ||
       existing.commitCompare?.compareVersion !== file.commitCompare?.compareVersion ||
+      existing.perforceShelf?.changelist !== file.perforceShelf?.changelist ||
+      existing.perforceShelf?.depotPath !== file.perforceShelf?.depotPath ||
+      existing.perforceShelf?.revision !== file.perforceShelf?.revision ||
       existing.conflict?.kind !== file.conflict?.kind ||
       existing.conflict?.conflictKind !== file.conflict?.conflictKind ||
       existing.conflict?.conflictStatus !== file.conflict?.conflictStatus ||
@@ -124,7 +131,8 @@ export function applyOpenFileToState(
       existing.runtimeEnvironmentId !== runtimeEnvironmentId ||
       existing.externalSshTargetId !== nextExternalSshTargetId ||
       refreshExternalSshProvenance ||
-      existing.fileContentReloadNonce !== fileContentReloadNonce
+      existing.fileContentReloadNonce !== fileContentReloadNonce ||
+      existing.diffContentReloadNonce !== diffContentReloadNonce
     if (!needsExistingUpdate) {
       return activeResult
     }
@@ -146,6 +154,7 @@ export function applyOpenFileToState(
               diffSource: file.diffSource,
               branchCompare: file.branchCompare,
               commitCompare: file.commitCompare,
+              perforceShelf: file.perforceShelf,
               branchOldPath: file.branchOldPath,
               combinedAlternate: file.combinedAlternate,
               combinedAreaFilter: file.combinedAreaFilter,
@@ -154,7 +163,8 @@ export function applyOpenFileToState(
               skippedConflicts: file.skippedConflicts,
               conflictReview: file.conflictReview,
               isPreview: updatedPreview,
-              fileContentReloadNonce
+              fileContentReloadNonce,
+              diffContentReloadNonce
             }
           : f
       ),

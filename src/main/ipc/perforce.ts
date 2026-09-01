@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import type { Store } from '../persistence'
 import { PerforceProvider } from '../perforce/provider'
 import { getPerforceSubmitPolicy } from '../perforce/submit-policy'
+import type { PerforceShelvedFile } from '../../shared/perforce-types'
 
 export function registerPerforceHandlers(store: Store, provider = new PerforceProvider()): void {
   ipcMain.handle('perforce:info', (_event, args: { worktreePath: string }) =>
@@ -54,6 +55,11 @@ export function registerPerforceHandlers(store: Store, provider = new PerforcePr
     'perforce:shelved-diff',
     (_event, args: { worktreePath: string; changelist: string; depotPath: string }) =>
       provider.shelvedDiff(args.worktreePath, args.changelist, args.depotPath)
+  )
+  ipcMain.handle(
+    'perforce:shelved-file-content',
+    (_event, args: { worktreePath: string; changelist: string; file: PerforceShelvedFile }) =>
+      provider.shelvedFileContent(args.worktreePath, args.changelist, args.file)
   )
   ipcMain.handle('perforce:sync', (_event, args: { worktreePath: string }) =>
     provider.sync(args.worktreePath)
