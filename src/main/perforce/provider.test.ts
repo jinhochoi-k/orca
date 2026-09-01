@@ -211,6 +211,24 @@ describe('PerforceProvider', () => {
     )
   })
 
+  it('loads full base and shelved file content for editor diff tabs', async () => {
+    const run = vi.fn<PerforceRun>(async (args) =>
+      result(args.at(-1)?.includes('@=123') ? 'shelved content' : 'base content')
+    )
+
+    await expect(
+      new PerforceProvider(run).shelvedFileContent('C:\\work', '123', {
+        depotPath: '//depot/main/a.ts',
+        status: 'modified',
+        revision: '7'
+      })
+    ).resolves.toEqual({ originalContent: 'base content', modifiedContent: 'shelved content' })
+    expect(run.mock.calls.map(([args]) => args)).toEqual([
+      ['print', '-q', '//depot/main/a.ts#7'],
+      ['print', '-q', '//depot/main/a.ts@=123']
+    ])
+  })
+
   it('treats Perforce no-change messages as an empty status', async () => {
     const run = vi.fn<PerforceRun>(async (args) => {
       if (args.join(' ') === '-ztag info') {

@@ -3,6 +3,7 @@ import { Download, FilePlus2, RefreshCw, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useAppStore } from '@/store'
 import type {
   PerforceChangelistsResult,
   PerforceFileEntry,
@@ -13,16 +14,20 @@ import { PerforceChangelistSection, PerforceLocalChanges } from './perforce-chan
 import { PerforceCreateChangelistDialog } from './perforce-create-changelist-dialog'
 import { PerforceDiffDialog, type PerforceDiff } from './perforce-diff-dialog'
 import { PerforceToolbarMenu } from './perforce-toolbar-menu'
+import { openPerforceShelvedDiffTab } from './open-perforce-shelved-diff'
 
 const EMPTY_CHANGESETS: PerforceChangelistsResult = { changelists: [], localChanges: [] }
 
 export function PerforceSourceControlPanel({
   repo,
+  worktreeId,
   worktreePath
 }: {
   repo: Repo
+  worktreeId: string
   worktreePath: string
 }) {
+  const openFile = useAppStore((state) => state.openFile)
   const [data, setData] = useState<PerforceChangelistsResult>(EMPTY_CHANGESETS)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -138,28 +143,10 @@ export function PerforceSourceControlPanel({
   )
 
   const openShelvedDiff = useCallback(
-    async (changelist: string, entry: PerforceShelvedFile) => {
-      setMutation(`shelved-diff:${entry.depotPath}`)
-      try {
-        const content = await window.api.perforce.shelvedDiff({
-          worktreePath,
-          changelist,
-          depotPath: entry.depotPath
-        })
-        setDiff({
-          path: entry.depotPath,
-          content: content || 'No textual diff is available.',
-          shelvedChangelist: changelist
-        })
-      } catch (caught) {
-        toast.error('Failed to load shelved diff', {
-          description: caught instanceof Error ? caught.message : String(caught)
-        })
-      } finally {
-        setMutation(null)
-      }
+    (changelist: string, entry: PerforceShelvedFile) => {
+      openPerforceShelvedDiffTab(openFile, { changelist, entry, worktreeId, worktreePath })
     },
-    [worktreePath]
+    [openFile, worktreeId, worktreePath]
   )
 
   const hasChanges =

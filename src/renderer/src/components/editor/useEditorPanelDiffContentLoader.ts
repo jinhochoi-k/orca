@@ -40,7 +40,10 @@ function inFlightDiffKey(
     file.diffSource === 'commit' && file.commitCompare
       ? `${file.commitCompare.parentOid ?? 'empty-tree'}..${file.commitCompare.commitOid}::${file.branchOldPath ?? ''}`
       : ''
-  return `${connectionId ?? ''}::${file.diffSource ?? ''}::${compareAgainstHead ? 'head' : 'default'}::${file.filePath}::${branch}::${commit}`
+  const shelf = file.perforceShelf
+    ? `${file.perforceShelf.changelist}::${file.perforceShelf.depotPath}::${file.perforceShelf.revision ?? ''}`
+    : ''
+  return `${connectionId ?? ''}::${file.diffSource ?? ''}::${compareAgainstHead ? 'head' : 'default'}::${file.filePath}::${branch}::${commit}::${shelf}`
 }
 
 export function useEditorPanelDiffContentLoader({
@@ -93,55 +96,70 @@ export function useEditorPanelDiffContentLoader({
         let pending = inFlightDiffReads.get(key)
         if (!pending) {
           const promise = (
-            effectiveDiffSource === 'commit'
-              ? commitCompare
-                ? getRuntimeGitCommitDiff(
-                    {
-                      settings: fileSettings,
-                      worktreeId: file.worktreeId,
-                      worktreePath,
-                      connectionId
-                    },
-                    {
-                      commitOid: commitCompare.commitOid,
-                      parentOid: commitCompare.parentOid,
-                      filePath: file.relativePath,
-                      oldPath: file.branchOldPath
-                    }
-                  )
-                : Promise.reject(new Error('Missing commit comparison for diff tab.'))
-              : effectiveDiffSource === 'branch' && branchCompare
-                ? getRuntimeGitBranchDiff(
-                    {
-                      settings: fileSettings,
-                      worktreeId: file.worktreeId,
-                      worktreePath,
-                      connectionId
-                    },
-                    {
-                      compare: {
-                        baseRef: branchCompare.baseRef,
-                        baseOid: branchCompare.baseOid!,
-                        headOid: branchCompare.headOid!,
-                        mergeBase: branchCompare.mergeBase!
+            effectiveDiffSource === 'perforce-shelved'
+              ? file.perforceShelf
+                ? window.api.perforce
+                    .shelvedFileContent({
+                      worktreePath: file.perforceShelf.worktreePath,
+                      changelist: file.perforceShelf.changelist,
+                      file: file.perforceShelf
+                    })
+                    .then((content) => ({
+                      kind: 'text' as const,
+                      ...content,
+                      originalIsBinary: false,
+                      modifiedIsBinary: false
+                    }))
+                : Promise.reject(new Error('Missing Perforce shelf metadata for diff tab.'))
+              : effectiveDiffSource === 'commit'
+                ? commitCompare
+                  ? getRuntimeGitCommitDiff(
+                      {
+                        settings: fileSettings,
+                        worktreeId: file.worktreeId,
+                        worktreePath,
+                        connectionId
                       },
-                      filePath: file.relativePath,
-                      oldPath: file.branchOldPath
-                    }
-                  )
-                : getRuntimeGitDiff(
-                    {
-                      settings: fileSettings,
-                      worktreeId: file.worktreeId,
-                      worktreePath,
-                      connectionId
-                    },
-                    {
-                      filePath: file.relativePath,
-                      staged: effectiveDiffSource === 'staged',
-                      compareAgainstHead
-                    }
-                  )
+                      {
+                        commitOid: commitCompare.commitOid,
+                        parentOid: commitCompare.parentOid,
+                        filePath: file.relativePath,
+                        oldPath: file.branchOldPath
+                      }
+                    )
+                  : Promise.reject(new Error('Missing commit comparison for diff tab.'))
+                : effectiveDiffSource === 'branch' && branchCompare
+                  ? getRuntimeGitBranchDiff(
+                      {
+                        settings: fileSettings,
+                        worktreeId: file.worktreeId,
+                        worktreePath,
+                        connectionId
+                      },
+                      {
+                        compare: {
+                          baseRef: branchCompare.baseRef,
+                          baseOid: branchCompare.baseOid!,
+                          headOid: branchCompare.headOid!,
+                          mergeBase: branchCompare.mergeBase!
+                        },
+                        filePath: file.relativePath,
+                        oldPath: file.branchOldPath
+                      }
+                    )
+                  : getRuntimeGitDiff(
+                      {
+                        settings: fileSettings,
+                        worktreeId: file.worktreeId,
+                        worktreePath,
+                        connectionId
+                      },
+                      {
+                        filePath: file.relativePath,
+                        staged: effectiveDiffSource === 'staged',
+                        compareAgainstHead
+                      }
+                    )
           ) as Promise<DiffContent>
           pending = { externalEventGeneration: options?.externalEventGeneration, promise }
           inFlightDiffReads.set(key, pending)

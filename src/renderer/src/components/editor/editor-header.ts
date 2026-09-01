@@ -20,6 +20,14 @@ export function shouldShowEditorPanelHeader(file: OpenFile, isCombinedDiff: bool
 }
 
 export function getEditorHeaderCopyState(file: OpenFile): EditorHeaderCopyState {
+  if (file.perforceShelf) {
+    return {
+      copyText: file.perforceShelf.depotPath,
+      copyToastLabel: 'Depot path copied',
+      pathLabel: `${file.perforceShelf.depotPath} (shelved CL ${file.perforceShelf.changelist})`,
+      pathTitle: file.perforceShelf.depotPath
+    }
+  }
   if (file.mode === 'conflict-review') {
     return {
       copyText: file.filePath,
@@ -86,6 +94,9 @@ export function getEditorHeaderOpenFileState(
     return { canOpen: branchEntry?.status !== 'deleted' || !branchEntry }
   }
   if (file.diffSource === 'commit') {
+    return { canOpen: false }
+  }
+  if (file.diffSource === 'perforce-shelved') {
     return { canOpen: false }
   }
 
