@@ -14,6 +14,7 @@ import {
   extractShelvedFileDiff,
   listPerforceChangelists,
   loadPerforceShelvedDiff,
+  loadPerforceShelvedFileContent,
   loadPerforceShelvedFiles,
   movePerforceFiles
 } from './changelist-operations'
@@ -172,6 +173,10 @@ export class PerforceProvider {
 
   async shelvedDiff(worktreePath: string, changelist: string, depotPath: string): Promise<string> {
     return loadPerforceShelvedDiff(this.run, worktreePath, changelist, depotPath)
+  }
+
+  async shelvedFileContent(worktreePath: string, changelist: string, file: PerforceShelvedFile) {
+    return loadPerforceShelvedFileContent(this.run, worktreePath, changelist, file)
   }
 
   async diff(worktreePath: string, filePath: string): Promise<string> {

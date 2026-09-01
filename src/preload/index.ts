@@ -93,6 +93,7 @@ import type {
 } from '../shared/filesystem-entry-types'
 import type { GitForkSyncExpectedUpstream, GitForkSyncResult } from '../shared/git-fork-sync'
 import type { GitStagingArea, GitUpstreamStatus } from '../shared/git-status-types'
+import type { PerforceShelvedFile } from '../shared/perforce-types'
 import type { GitHubCommentResult, GitHubReactionContent } from '../shared/github/comment-types'
 import type {
   GitHubPRRefreshCandidate,
@@ -3820,6 +3821,11 @@ const api = {
       ipcRenderer.invoke('perforce:shelved-files', args),
     shelvedDiff: (args: { worktreePath: string; changelist: string; depotPath: string }) =>
       ipcRenderer.invoke('perforce:shelved-diff', args),
+    shelvedFileContent: (args: {
+      worktreePath: string
+      changelist: string
+      file: PerforceShelvedFile
+    }) => ipcRenderer.invoke('perforce:shelved-file-content', args),
     sync: (args: { worktreePath: string }) => ipcRenderer.invoke('perforce:sync', args)
   },
 

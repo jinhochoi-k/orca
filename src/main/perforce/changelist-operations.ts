@@ -4,6 +4,7 @@ import type {
   PerforceInfoResult,
   PerforceMutationResult,
   PerforceShelvedFile,
+  PerforceShelvedFileContent,
   PerforceStatusResult
 } from '../../shared/perforce-types'
 import {
@@ -19,6 +20,13 @@ function sanitizeChangelistId(changelist: string): string {
     return changelist
   }
   throw new Error('Invalid Perforce changelist')
+}
+
+function sanitizeDepotPath(depotPath: string): string {
+  if (depotPath.startsWith('//') && !/[\r\n@#]/.test(depotPath)) {
+    return depotPath
+  }
+  throw new Error('Invalid shelved Perforce file')
 }
 
 function parseShelvedFileRecords(output: string): Record<string, string>[] {
@@ -179,4 +187,30 @@ export async function loadPerforceShelvedDiff(
   }
   const output = await runPerforceChecked(run, worktreePath, ['describe', '-du', '-S', id])
   return extractShelvedFileDiff(output, depotPath)
+}
+
+export async function loadPerforceShelvedFileContent(
+  run: PerforceRun,
+  worktreePath: string,
+  changelist: string,
+  file: PerforceShelvedFile
+): Promise<PerforceShelvedFileContent> {
+  const id = sanitizeChangelistId(changelist)
+  const depotPath = sanitizeDepotPath(file.depotPath)
+  if (id === 'default') {
+    throw new Error('Invalid shelved Perforce file')
+  }
+  const revision = file.revision && /^\d+$/.test(file.revision) ? file.revision : null
+  if (file.status !== 'added' && revision === null) {
+    throw new Error('Shelved file base revision is unavailable')
+  }
+  const [originalContent, modifiedContent] = await Promise.all([
+    file.status === 'added'
+      ? Promise.resolve('')
+      : runPerforceChecked(run, worktreePath, ['print', '-q', `${depotPath}#${revision}`]),
+    file.status === 'deleted'
+      ? Promise.resolve('')
+      : runPerforceChecked(run, worktreePath, ['print', '-q', `${depotPath}@=${id}`])
+  ])
+  return { originalContent, modifiedContent }
 }

@@ -4,6 +4,11 @@ import { basename } from '@/lib/path'
 type EditorLabelVariant = 'fileName' | 'relativePath' | 'fullPath'
 
 function getBaseLabel(file: OpenFile, variant: EditorLabelVariant): string {
+  if (file.perforceShelf) {
+    return variant === 'fileName'
+      ? basename(file.perforceShelf.depotPath)
+      : file.perforceShelf.depotPath
+  }
   switch (variant) {
     case 'fullPath':
       return file.filePath
@@ -18,7 +23,8 @@ const DIFF_SOURCE_LABELS: Record<string, string> = {
   staged: 'staged diff',
   unstaged: 'diff',
   branch: 'branch diff',
-  commit: 'commit diff'
+  commit: 'commit diff',
+  'perforce-shelved': 'shelved diff'
 }
 
 export function getEditorDisplayLabel(
@@ -58,6 +64,9 @@ export function getEditorDisplayLabel(
   }
 
   const baseLabel = getBaseLabel(file, variant)
+  if (source === 'perforce-shelved') {
+    return `${baseLabel} (shelved CL ${file.perforceShelf?.changelist ?? '?'})`
+  }
   const suffix = (source && DIFF_SOURCE_LABELS[source]) ?? 'diff'
   return `${baseLabel} (${suffix})`
 }

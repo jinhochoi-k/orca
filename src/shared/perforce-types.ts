@@ -54,3 +54,8 @@ export type PerforceShelvedFile = {
   status: GitFileStatus
   revision?: string
 }
+
+export type PerforceShelvedFileContent = {
+  originalContent: string
+  modifiedContent: string
+}
