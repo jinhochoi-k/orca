@@ -29,6 +29,7 @@ import { RepositoryWindowsRuntimeSection } from './RepositoryWindowsRuntimeSecti
 import { matchesRepositoryIdentitySearch } from './repository-identity-search'
 import { RepositoryWorktreeDefaultsSection } from './RepositoryWorktreeDefaultsSection'
 import { getProjectRuntimeSessionSummary } from './repository-runtime-session-summary'
+import { RepositoryPerforceMigrationControl } from './RepositoryPerforceMigrationControl'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../store/worktree-visibility-defaults-by-host'
 export { getRepositoryPaneSearchEntries }
 export { matchesRepositoryIdentitySearch } from './repository-identity-search'
@@ -248,12 +249,11 @@ export function RepositoryPane({
               <span className="text-foreground">{getRepoKindLabel(repo)}</span>
             </p>
             {isFolder ? (
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.settings.RepositoryPane.ee5a290616',
-                  'Opened as folder. Git features are unavailable for this workspace.'
-                )}
-              </p>
+              <RepositoryPerforceMigrationControl
+                path={repo.path}
+                canMigrate={repo.kind === 'folder' && selectedHostId === 'local'}
+                onMigrate={() => updateSelectedRepo(repo.id, { kind: 'perforce' })}
+              />
             ) : null}
           </div>
           <SearchableSetting

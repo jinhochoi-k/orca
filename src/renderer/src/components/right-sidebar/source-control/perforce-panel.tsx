@@ -1,25 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, Download, FilePlus2, Loader2, RefreshCw, ScanSearch, Undo2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Download, FilePlus2, RefreshCw, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import type { PerforceFileEntry, PerforceStatusResult } from '../../../../../shared/perforce-types'
+import type {
+  PerforceChangelistsResult,
+  PerforceFileEntry,
+  PerforceShelvedFile
+} from '../../../../../shared/perforce-types'
 import type { Repo } from '../../../../../shared/repo-types'
-import { PerforceSubmitPolicyControl } from './perforce-submit-policy-control'
+import { PerforceChangelistSection, PerforceLocalChanges } from './perforce-changelist-section'
+import { PerforceCreateChangelistDialog } from './perforce-create-changelist-dialog'
+import { PerforceToolbarMenu } from './perforce-toolbar-menu'
 
-const EMPTY_STATUS: PerforceStatusResult = { entries: [] }
-
-function statusLabel(entry: PerforceFileEntry): string {
-  return entry.status === 'added'
-    ? 'A'
-    : entry.status === 'deleted'
-      ? 'D'
-      : entry.status === 'renamed'
-        ? 'R'
-        : 'M'
-}
+const EMPTY_CHANGESETS: PerforceChangelistsResult = { changelists: [], localChanges: [] }
 
 export function PerforceSourceControlPanel({
   repo,
@@ -28,19 +23,19 @@ export function PerforceSourceControlPanel({
   repo: Repo
   worktreePath: string
 }) {
-  const [status, setStatus] = useState<PerforceStatusResult>(EMPTY_STATUS)
+  const [data, setData] = useState<PerforceChangelistsResult>(EMPTY_CHANGESETS)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mutation, setMutation] = useState<string | null>(null)
-  const [message, setMessage] = useState('')
   const [diff, setDiff] = useState<{ path: string; content: string } | null>(null)
-  const submitDisabled = repo.perforceSubmitDisabled === true
+  const [createOpen, setCreateOpen] = useState(false)
+  const [shelvedByChange, setShelvedByChange] = useState<Record<string, PerforceShelvedFile[]>>({})
 
   const refresh = useCallback(
     async (includeUnopened = false) => {
       setLoading(true)
       try {
-        setStatus(await window.api.perforce.status({ worktreePath, includeUnopened }))
+        setData(await window.api.perforce.changelists({ worktreePath, includeUnopened }))
         setError(null)
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : String(caught))
@@ -57,20 +52,12 @@ export function PerforceSourceControlPanel({
     return () => window.clearInterval(timer)
   }, [refresh])
 
-  const groups = useMemo(
-    () => ({
-      opened: status.entries.filter((entry) => entry.area === 'staged'),
-      local: status.entries.filter((entry) => entry.area !== 'staged')
-    }),
-    [status.entries]
-  )
-
   const mutate = useCallback(
     async (label: string, action: () => Promise<void>) => {
       setMutation(label)
       try {
         await action()
-        await refresh()
+        await refresh(false)
       } catch (caught) {
         toast.error(`${label} failed`, {
           description: caught instanceof Error ? caught.message : String(caught)
@@ -84,7 +71,7 @@ export function PerforceSourceControlPanel({
 
   const openDiff = useCallback(
     async (entry: PerforceFileEntry) => {
-      setMutation(`diff:${entry.path}`)
+      setMutation(entry.path)
       try {
         const content = await window.api.perforce.diff({ worktreePath, filePath: entry.path })
         setDiff({ path: entry.path, content: content || 'No textual diff is available.' })
@@ -99,110 +86,105 @@ export function PerforceSourceControlPanel({
     [worktreePath]
   )
 
-  const runSubmission = useCallback(
-    async (kind: 'submit' | 'shelve') => {
-      const description = message.trim()
-      if (!description) {
-        return
-      }
-      setMutation(kind)
-      try {
-        const result = await window.api.perforce[kind]({ worktreePath, message: description })
-        if (!result.success) {
-          throw new Error(result.error || `Perforce ${kind} failed`)
+  const moveFile = useCallback(
+    (entry: PerforceFileEntry, changelist: string) => {
+      void mutate(`Move ${entry.path}`, async () => {
+        if (entry.area !== 'staged') {
+          await window.api.perforce.open({ worktreePath, filePath: entry.path })
         }
-        setMessage('')
-        toast.success(
-          kind === 'submit'
-            ? 'Changelist submitted'
-            : `Shelved${result.changelist ? ` as ${result.changelist}` : ''}`
-        )
-        await refresh()
+        await window.api.perforce.moveFiles({ worktreePath, changelist, filePaths: [entry.path] })
+      })
+    },
+    [mutate, worktreePath]
+  )
+
+  const createChangelist = useCallback(
+    async (description: string) => {
+      setMutation('create-changelist')
+      try {
+        const result = await window.api.perforce.createChangelist({ worktreePath, description })
+        if (!result.success) {
+          throw new Error(result.error || 'Perforce changelist creation failed')
+        }
+        setCreateOpen(false)
+        toast.success(`CL ${result.changelist} created`)
+        await refresh(false)
       } catch (caught) {
-        toast.error(`Perforce ${kind} failed`, {
+        toast.error('Failed to create changelist', {
           description: caught instanceof Error ? caught.message : String(caught)
         })
       } finally {
         setMutation(null)
       }
     },
-    [message, refresh, worktreePath]
+    [refresh, worktreePath]
   )
 
-  const renderGroup = (title: string, entries: PerforceFileEntry[]) => (
-    <section>
-      <div className="flex h-7 items-center border-b border-border/60 px-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {title}
-        <span className="ml-auto tabular-nums">{entries.length}</span>
-      </div>
-      {entries.map((entry) => {
-        const busy = mutation?.endsWith(entry.path) === true
-        return (
-          <div
-            key={`${entry.area}:${entry.path}`}
-            className="group flex min-h-8 items-center gap-2 border-b border-border/40 px-2 text-xs hover:bg-muted/40"
-          >
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
-              onClick={() => void openDiff(entry)}
-            >
-              <span
-                className={cn(
-                  'w-4 shrink-0 text-center font-mono font-semibold',
-                  entry.status === 'deleted' ? 'text-red-400' : 'text-amber-400'
-                )}
-              >
-                {busy ? <Loader2 className="size-3 animate-spin" /> : statusLabel(entry)}
-              </span>
-              <span className="truncate font-mono" title={entry.path}>
-                {entry.path}
-              </span>
-            </button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 opacity-70 group-hover:opacity-100"
-              title={
-                entry.area === 'staged'
-                  ? 'Remove from changelist and keep local file'
-                  : 'Open in changelist'
-              }
-              disabled={mutation !== null}
-              onClick={() =>
-                void mutate(entry.area === 'staged' ? 'Revert' : 'Open', () =>
-                  entry.area === 'staged'
-                    ? window.api.perforce.revert({ worktreePath, filePath: entry.path })
-                    : window.api.perforce.open({ worktreePath, filePath: entry.path })
-                )
-              }
-            >
-              {entry.area === 'staged' ? (
-                <Undo2 className="size-3.5" />
-              ) : (
-                <FilePlus2 className="size-3.5" />
-              )}
-            </Button>
-          </div>
-        )
-      })}
-    </section>
+  const loadShelved = useCallback(
+    async (changelist: string) => {
+      setMutation(`shelved:${changelist}`)
+      try {
+        const files = await window.api.perforce.shelvedFiles({ worktreePath, changelist })
+        setShelvedByChange((current) => ({ ...current, [changelist]: files }))
+      } catch (caught) {
+        toast.error('Failed to load shelved files', {
+          description: caught instanceof Error ? caught.message : String(caught)
+        })
+      } finally {
+        setMutation(null)
+      }
+    },
+    [worktreePath]
   )
+
+  const openShelvedDiff = useCallback(
+    async (changelist: string, entry: PerforceShelvedFile) => {
+      setMutation(`shelved-diff:${entry.depotPath}`)
+      try {
+        const content = await window.api.perforce.shelvedDiff({
+          worktreePath,
+          changelist,
+          depotPath: entry.depotPath
+        })
+        setDiff({
+          path: `${entry.depotPath} (shelved in CL ${changelist})`,
+          content: content || 'No textual diff is available.'
+        })
+      } catch (caught) {
+        toast.error('Failed to load shelved diff', {
+          description: caught instanceof Error ? caught.message : String(caught)
+        })
+      } finally {
+        setMutation(null)
+      }
+    },
+    [worktreePath]
+  )
+
+  const hasChanges =
+    data.localChanges.length > 0 || data.changelists.some((change) => change.files.length > 0)
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-2">
+      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2">
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium">Perforce</div>
           <div className="truncate text-[10px] text-muted-foreground">
-            {[status.client, status.stream].filter(Boolean).join(' · ') || 'Client workspace'}
+            {[data.client, data.stream].filter(Boolean).join(' · ') || 'Client workspace'}
           </div>
         </div>
         <Button
           variant="ghost"
-          size="icon"
-          className="size-7"
-          title="Scan for unopened local changes"
+          size="icon-xs"
+          aria-label="Create changelist"
+          onClick={() => setCreateOpen(true)}
+        >
+          <FilePlus2 className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Scan for local changes"
           disabled={loading}
           onClick={() => void refresh(true)}
         >
@@ -210,9 +192,8 @@ export function PerforceSourceControlPanel({
         </Button>
         <Button
           variant="ghost"
-          size="icon"
-          className="size-7"
-          title="Sync workspace"
+          size="icon-xs"
+          aria-label="Sync workspace"
           disabled={mutation !== null}
           onClick={() => void mutate('Sync', () => window.api.perforce.sync({ worktreePath }))}
         >
@@ -220,65 +201,56 @@ export function PerforceSourceControlPanel({
         </Button>
         <Button
           variant="ghost"
-          size="icon"
-          className="size-7"
-          title="Refresh changes"
+          size="icon-xs"
+          aria-label="Refresh changelists"
           disabled={loading}
           onClick={() => void refresh(false)}
         >
           <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
         </Button>
+        <PerforceToolbarMenu repo={repo} />
       </div>
 
       <div className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto">
         {error ? (
           <div className="p-3 text-xs text-destructive">{error}</div>
-        ) : status.entries.length === 0 && !loading ? (
-          <div className="p-4 text-center text-xs text-muted-foreground">No pending changes</div>
+        ) : !hasChanges && data.changelists.length <= 1 && !loading ? (
+          <div className="p-4 text-center text-xs text-muted-foreground">
+            No pending changelists or local changes
+          </div>
         ) : (
           <>
-            {renderGroup('Opened in changelist', groups.opened)}
-            {renderGroup('Local changes', groups.local)}
+            {data.changelists.map((changelist) => (
+              <PerforceChangelistSection
+                key={changelist.id}
+                changelist={changelist}
+                changelists={data.changelists}
+                shelvedFiles={shelvedByChange[changelist.id]}
+                shelvedLoading={mutation === `shelved:${changelist.id}`}
+                busyPath={mutation}
+                onDiff={(entry) => void openDiff(entry)}
+                onMove={moveFile}
+                onLoadShelved={() => void loadShelved(changelist.id)}
+                onShelvedDiff={(entry) => void openShelvedDiff(changelist.id, entry)}
+              />
+            ))}
+            <PerforceLocalChanges
+              entries={data.localChanges}
+              changelists={data.changelists}
+              busyPath={mutation}
+              onDiff={(entry) => void openDiff(entry)}
+              onMove={moveFile}
+            />
           </>
         )}
       </div>
 
-      <div className="shrink-0 space-y-2 border-t border-border p-2">
-        <PerforceSubmitPolicyControl repo={repo} />
-        <Textarea
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          className="min-h-16 resize-none text-xs"
-          placeholder="Changelist description"
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            size="sm"
-            disabled={
-              submitDisabled || !message.trim() || groups.opened.length === 0 || mutation !== null
-            }
-            title={submitDisabled ? 'Submit is disabled for this project' : 'Submit changelist'}
-            onClick={() => void runSubmission('submit')}
-          >
-            {mutation === 'submit' && <Loader2 className="size-3.5 animate-spin" />}
-            Submit
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!message.trim() || groups.opened.length === 0 || mutation !== null}
-            onClick={() => void runSubmission('shelve')}
-          >
-            {mutation === 'shelve' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Archive className="size-3.5" />
-            )}
-            Shelve
-          </Button>
-        </div>
-      </div>
-
+      <PerforceCreateChangelistDialog
+        open={createOpen}
+        creating={mutation === 'create-changelist'}
+        onOpenChange={setCreateOpen}
+        onCreate={(description) => void createChangelist(description)}
+      />
       <Dialog open={diff !== null} onOpenChange={(open) => !open && setDiff(null)}>
         <DialogContent className="flex max-h-[80vh] max-w-4xl flex-col">
           <DialogHeader>
