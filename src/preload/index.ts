@@ -3796,6 +3796,23 @@ const api = {
     }): Promise<string | null> => ipcRenderer.invoke('git:remoteCommitUrl', args)
   },
 
+  perforce: {
+    info: (args: { worktreePath: string }) => ipcRenderer.invoke('perforce:info', args),
+    status: (args: { worktreePath: string; includeUnopened?: boolean }) =>
+      ipcRenderer.invoke('perforce:status', args),
+    diff: (args: { worktreePath: string; filePath: string }) =>
+      ipcRenderer.invoke('perforce:diff', args),
+    open: (args: { worktreePath: string; filePath: string }) =>
+      ipcRenderer.invoke('perforce:open', args),
+    revert: (args: { worktreePath: string; filePath: string }) =>
+      ipcRenderer.invoke('perforce:revert', args),
+    submit: (args: { worktreePath: string; message: string }) =>
+      ipcRenderer.invoke('perforce:submit', args),
+    shelve: (args: { worktreePath: string; message: string }) =>
+      ipcRenderer.invoke('perforce:shelve', args),
+    sync: (args: { worktreePath: string }) => ipcRenderer.invoke('perforce:sync', args)
+  },
+
   ui: {
     get: () => ipcRenderer.invoke('ui:get'),
     set: (args) => ipcRenderer.invoke('ui:set', args),

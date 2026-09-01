@@ -1,36 +1,21 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { track } from '@/lib/telemetry'
-import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { hasSourceControl } from '../../../../shared/repo-kind'
 import {
   buildNestedRepoScanTelemetry,
-  createNestedRepoTelemetryAttemptId,
-  type NestedRepoTelemetryRuntimeKind
+  createNestedRepoTelemetryAttemptId
 } from '../../../../shared/nested-repo-telemetry'
 import type { AddRepoExistingWorkspaceSource } from '../../../../shared/telemetry-events'
-import type { NestedRepoScanResult } from '../../../../shared/project-group-types'
-import type { Repo } from '../../../../shared/repo-types'
 import type { WorktreeFetchOptions } from '@/store/slices/worktree-helpers'
 import type { RepoSlice } from '@/store/repos/repo-state'
+import { addLocalPerforceWorkspace, type LocalPathAddResult } from './add-local-perforce-workspace'
+import type { ShowNestedRepoReview } from './add-repo-local-types'
+import { rejectLocalFolderForRemoteRuntime } from './local-folder-runtime-guard'
 import { createNestedRepoScanId } from './add-repo-dialog-types'
 import { translate } from '@/i18n/i18n'
 import { worktreeRefreshOptions } from './add-repo-runtime-owner'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
-
-type ShowNestedRepoReview = (args: {
-  scan: NestedRepoScanResult
-  selectedPath: string
-  connectionId: string | null
-  attemptId: string
-  runtimeKind: NestedRepoTelemetryRuntimeKind
-  inProgress: boolean
-  scanId: string | null
-  runtimeEnvironmentId?: string | null
-}) => void
-
-type LocalPathAddResult =
-  | { status: 'completed'; repo: Repo }
-  | { status: 'cancelled' | 'paused' | 'skipped' }
 
 type LocalPathAddMode = 'single' | 'batch'
 
@@ -90,15 +75,26 @@ export function useAddRepoLocalFolderFlow({
       gen: number,
       mode: LocalPathAddMode = 'single'
     ): Promise<LocalPathAddResult> => {
-      if (activeRuntimeEnvironmentId?.trim()) {
-        toast.error(
-          translate(
-            'auto.components.sidebar.useAddRepoLocalFolderFlow.7ab10e4974',
-            'Use a host path to add projects from a remote host.'
-          )
-        )
-        closeModal()
+      if (
+        rejectLocalFolderForRemoteRuntime({
+          runtimeEnvironmentId: activeRuntimeEnvironmentId,
+          closeModal
+        })
+      ) {
         return { status: 'paused' }
+      }
+      const perforceResult = await addLocalPerforceWorkspace({
+        path,
+        source,
+        addRepoPath,
+        fetchWorktrees,
+        onSourceControlRepoReady: onGitRepoReady,
+        setBusyLabel: setAddProjectBusyLabel,
+        isCurrent: () => gen === localAddGenRef.current,
+        deferReady: mode === 'batch'
+      })
+      if (perforceResult) {
+        return perforceResult
       }
       setAddProjectBusyLabel('Scanning for repositories...')
       try {
@@ -170,7 +166,7 @@ export function useAddRepoLocalFolderFlow({
         if (!repo) {
           return { status: 'paused' }
         }
-        if (isGitRepoKind(repo)) {
+        if (hasSourceControl(repo)) {
           // Why: a transient non-authoritative refresh must not strand a persisted repo.
           const ownerOptions = worktreeRefreshOptions(activeRuntimeEnvironmentId ?? null)
           await fetchWorktrees(repo.id, ownerOptions)
@@ -231,7 +227,7 @@ export function useAddRepoLocalFolderFlow({
 
   const handleAddLocalPaths = useCallback(
     async (paths: string[], source: AddRepoExistingWorkspaceSource, gen: number): Promise<void> => {
-      const gitRepoIds: string[] = []
+      const sourceControlRepoIds: string[] = []
       const shouldDeferGitRepoReady = paths.length > 1
       let skippedCount = 0
       for (const path of paths) {
@@ -248,8 +244,8 @@ export function useAddRepoLocalFolderFlow({
         if (result.status !== 'completed') {
           return
         }
-        if (isGitRepoKind(result.repo)) {
-          gitRepoIds.push(result.repo.id)
+        if (hasSourceControl(result.repo)) {
+          sourceControlRepoIds.push(result.repo.id)
         }
       }
       if (gen !== localAddGenRef.current) {
@@ -269,9 +265,9 @@ export function useAddRepoLocalFolderFlow({
           }
         )
       }
-      if (shouldDeferGitRepoReady && gitRepoIds.length > 0) {
+      if (shouldDeferGitRepoReady && sourceControlRepoIds.length > 0) {
         await onGitRepoReady(
-          gitRepoIds[0],
+          sourceControlRepoIds[0],
           source,
           worktreeRefreshOptions(activeRuntimeEnvironmentId ?? null).executionHostId
         )

@@ -24,7 +24,7 @@ const items: ActivityBarItem[] = [
     icon: Files,
     title: 'Source Control',
     shortcut: '',
-    gitOnly: true
+    sourceControlOnly: true
   },
   { id: 'ports', icon: Files, title: 'Ports', shortcut: '', sshOnly: true },
   // Plugin panels carry no visibility flags, so they show in every context.
@@ -42,7 +42,8 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: false
+        isSshRepo: false,
+        hasSourceControl: true
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'plugin:orca-samples.my-plugin/dashboard'])
 
@@ -50,7 +51,8 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: false,
         isFolderWorkspace: false,
-        isSshRepo: true
+        isSshRepo: true,
+        hasSourceControl: true
       }).map((item) => item.id)
     ).toEqual(['explorer', 'source-control', 'ports', 'plugin:orca-samples.my-plugin/dashboard'])
   })
@@ -60,7 +62,8 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: true,
         isFolderWorkspace: true,
-        isSshRepo: true
+        isSshRepo: true,
+        hasSourceControl: false
       }).map((item) => item.id)
     ).toEqual([
       'explorer',
@@ -74,8 +77,20 @@ describe('getVisibleRightSidebarActivityItems', () => {
       getVisibleRightSidebarActivityItems(items, {
         isFolder: true,
         isFolderWorkspace: false,
-        isSshRepo: true
+        isSshRepo: true,
+        hasSourceControl: false
       }).map((item) => item.id)
     ).toEqual(['explorer', 'ports', 'plugin:orca-samples.my-plugin/dashboard'])
+  })
+
+  it('keeps Source Control visible for a Perforce project using folder workspace semantics', () => {
+    expect(
+      getVisibleRightSidebarActivityItems(items, {
+        isFolder: true,
+        isFolderWorkspace: true,
+        isSshRepo: false,
+        hasSourceControl: true
+      }).map((item) => item.id)
+    ).toEqual(['explorer', 'source-control', 'plugin:orca-samples.my-plugin/dashboard'])
   })
 })

@@ -401,7 +401,7 @@ import type {
   ProjectHostSetupUpdateResult,
   ProjectUpdateArgs
 } from '../../shared/project-types'
-import type { BaseRefSearchResult, Repo } from '../../shared/repo-types'
+import type { BaseRefSearchResult, Repo, RepoKind } from '../../shared/repo-types'
 import type { Tab, TabGroupLayoutNode } from '../../shared/tab-types'
 import type { TerminalQuickCommand } from '../../shared/terminal-quick-command-types'
 import type {
@@ -1284,6 +1284,7 @@ import {
   prepareWorktreeCreateForRepo
 } from '../worktree-create-preparation'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
+import { PerforceProvider } from '../perforce/provider'
 import { getWorktreeWatcherRemoval } from '../ipc/worktree-watcher-removal'
 import { acquireWatcherRemovalGate } from '../ipc/watcher-removal-gate'
 import {
@@ -23770,7 +23771,7 @@ export class OrcaRuntimeService {
 
   async addRepo(
     path: string,
-    kind: 'git' | 'folder' = 'git',
+    kind: RepoKind = 'git',
     executionHostId?: ExecutionHostId | null,
     displayName?: string
   ): Promise<Repo> {
@@ -23787,6 +23788,12 @@ export class OrcaRuntimeService {
     }
     if (kind === 'git' && !isGitRepo(path)) {
       throw new Error(`Not a valid git repository: ${path}`)
+    }
+    if (kind === 'perforce') {
+      const info = await new PerforceProvider().info(path)
+      if (!info.available || !info.isWorkspace) {
+        throw new Error(info.error || `Not a valid Perforce client workspace: ${path}`)
+      }
     }
 
     const existing = this.store.getRepos().find((repo) => {

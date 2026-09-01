@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
-import { isFolderRepo } from '../../../../shared/repo-kind'
+import { hasSourceControl, isFolderRepo } from '../../../../shared/repo-kind'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { getVisibleRightSidebarActivityItems } from './right-sidebar-activity-visibility'
 import { getPluginPanelActivityItems } from './plugin-panel-activity-items'
@@ -95,7 +95,7 @@ export function useRightSidebarActivityItems({
         icon: GitBranch,
         title: translate('auto.components.right.sidebar.index.0314901467', 'Source Control'),
         shortcut: sourceControlShortcut === 'Unassigned' ? '' : sourceControlShortcut,
-        gitOnly: true
+        sourceControlOnly: true
       },
       {
         id: 'checks',
@@ -130,9 +130,10 @@ export function useRightSidebarActivityItems({
       getVisibleRightSidebarActivityItems(activityItems, {
         isFolder,
         isFolderWorkspace,
-        isSshRepo
+        isSshRepo,
+        hasSourceControl: activeRepo ? hasSourceControl(activeRepo) : false
       }),
-    [activityItems, isFolder, isFolderWorkspace, isSshRepo]
+    [activeRepo, activityItems, isFolder, isFolderWorkspace, isSshRepo]
   )
 
   const activeFolderWorkspaceKey = isFolderWorkspace ? (activeWorktreeId ?? null) : null
