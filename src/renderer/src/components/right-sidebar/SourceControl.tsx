@@ -61,7 +61,7 @@ function SourceControlInner(): React.JSX.Element {
   const activeWorktree = useActiveWorktree()
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   if (activeWorktree && activeRepo && isPerforceRepoKind(activeRepo)) {
-    return <PerforceSourceControlPanel worktreePath={activeWorktree.path} />
+    return <PerforceSourceControlPanel repo={activeRepo} worktreePath={activeWorktree.path} />
   }
   return <SourceControlPanel />
 }

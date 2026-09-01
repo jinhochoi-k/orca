@@ -44,6 +44,7 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
             | 'worktreeVisibilitySourcePreferences'
             | 'projectGroupId'
             | 'projectGroupOrder'
+            | 'perforceSubmitDisabled'
           >
         > & {
           externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
@@ -74,6 +75,12 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
         updates.forkSyncMode !== 'off'
       ) {
         delete updates.forkSyncMode
+      }
+      if (
+        'perforceSubmitDisabled' in updates &&
+        typeof updates.perforceSubmitDisabled !== 'boolean'
+      ) {
+        delete updates.perforceSubmitDisabled
       }
       // Why: worktree materialization calls .trim() per entry, so strip non-string[] at the boundary to avoid a silent throw later.
       if ('symlinkPaths' in updates && updates.symlinkPaths !== undefined) {

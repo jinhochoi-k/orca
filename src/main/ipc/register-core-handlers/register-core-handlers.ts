@@ -199,7 +199,7 @@ export function registerCoreHandlers(
   registerBrowserHandlers()
   registerShellHandlers(store)
   registerPetHandlers()
-  registerPerforceHandlers()
+  registerPerforceHandlers(store)
   registerSessionHandlers(store)
   registerUIHandlers(store, { isDashboardPopoutRenderer })
   registerEmulatorFrameStreamHandlers()

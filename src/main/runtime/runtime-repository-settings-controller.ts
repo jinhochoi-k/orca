@@ -34,6 +34,7 @@ type RepositoryUpdates = Partial<
     | 'agentWorktreeVisibility'
     | 'projectGroupId'
     | 'projectGroupOrder'
+    | 'perforceSubmitDisabled'
   >
 > & {
   sourceControlAi?: Repo['sourceControlAi'] | null

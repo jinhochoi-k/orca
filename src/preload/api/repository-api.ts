@@ -68,6 +68,7 @@ export type RepositoryApi = {
         | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
         | 'projectGroupOrder'
+        | 'perforceSubmitDisabled'
         | 'forkSyncMode'
       >
     > & {

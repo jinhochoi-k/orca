@@ -185,6 +185,7 @@ export class RepoLifecycleOperations {
         | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
         | 'projectGroupOrder'
+        | 'perforceSubmitDisabled'
         | 'projectHostSetupMethod'
       >
     > & {
