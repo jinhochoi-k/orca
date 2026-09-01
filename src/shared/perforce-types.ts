@@ -53,9 +53,12 @@ export type PerforceShelvedFile = {
   depotPath: string
   status: GitFileStatus
   revision?: string
+  fileType?: string
 }
 
 export type PerforceShelvedFileContent = {
   originalContent: string
   modifiedContent: string
+  originalIsBinary: boolean
+  modifiedIsBinary: boolean
 }

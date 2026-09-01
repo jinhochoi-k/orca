@@ -64,22 +64,33 @@ export function EditorDiffFileSurface({
         />
       )
     }
+    const isUnrealAsset = /\.(?:uasset|umap)$/i.test(activeFile.relativePath)
     return (
       <div className="flex h-full items-center justify-center px-6 text-center">
         <div className="space-y-2">
           <div className="text-sm font-medium text-foreground">
-            {translate('auto.components.editor.EditorContent.78541e254e', 'Binary file changed')}
+            {isUnrealAsset
+              ? translate(
+                  'auto.components.editor.EditorDiffFileSurface.unrealAssetChanged',
+                  'Unreal asset changed'
+                )
+              : translate('auto.components.editor.EditorContent.78541e254e', 'Binary file changed')}
           </div>
           <div className="text-xs text-muted-foreground">
-            {activeFile.diffSource === 'branch'
+            {isUnrealAsset
               ? translate(
-                  'auto.components.editor.EditorContent.3c6e71df22',
-                  'Text diff is unavailable for this file in branch compare.'
+                  'auto.components.editor.EditorDiffFileSurface.unrealAssetDiffUnavailable',
+                  'Unreal asset files are binary, so Orca cannot display a text diff. Open the file in Unreal Editor or a configured asset diff tool to compare it.'
                 )
-              : translate(
-                  'auto.components.editor.EditorContent.8a0898ae4c',
-                  'Text diff is unavailable for this file.'
-                )}
+              : activeFile.diffSource === 'branch'
+                ? translate(
+                    'auto.components.editor.EditorContent.3c6e71df22',
+                    'Text diff is unavailable for this file in branch compare.'
+                  )
+                : translate(
+                    'auto.components.editor.EditorContent.8a0898ae4c',
+                    'Text diff is unavailable for this file.'
+                  )}
           </div>
         </div>
       </div>

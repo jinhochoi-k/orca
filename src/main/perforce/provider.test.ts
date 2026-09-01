@@ -195,7 +195,9 @@ describe('PerforceProvider', () => {
   it('loads shelved files and an individual shelved diff on demand', async () => {
     const run = vi.fn<PerforceRun>(async (args) => {
       if (args.join(' ') === '-ztag describe -S -s 123') {
-        return result('... depotFile0 //depot/main/a.ts\n... action0 edit\n... rev0 7')
+        return result(
+          '... depotFile0 //depot/main/a.ts\n... action0 edit\n... rev0 7\n... type0 text'
+        )
       }
       return result(
         '==== //depot/main/a.ts#7 - //depot/main/a.ts@=123 (text) ====\n@@ -1 +1 @@\n-old\n+new'
@@ -204,7 +206,7 @@ describe('PerforceProvider', () => {
     const provider = new PerforceProvider(run)
 
     await expect(provider.shelvedFiles('C:\\work', '123')).resolves.toEqual([
-      { depotPath: '//depot/main/a.ts', status: 'modified', revision: '7' }
+      { depotPath: '//depot/main/a.ts', status: 'modified', revision: '7', fileType: 'text' }
     ])
     await expect(provider.shelvedDiff('C:\\work', '123', '//depot/main/a.ts')).resolves.toContain(
       '+new'
@@ -222,11 +224,35 @@ describe('PerforceProvider', () => {
         status: 'modified',
         revision: '7'
       })
-    ).resolves.toEqual({ originalContent: 'base content', modifiedContent: 'shelved content' })
+    ).resolves.toEqual({
+      originalContent: 'base content',
+      modifiedContent: 'shelved content',
+      originalIsBinary: false,
+      modifiedIsBinary: false
+    })
     expect(run.mock.calls.map(([args]) => args)).toEqual([
       ['print', '-q', '//depot/main/a.ts#7'],
       ['print', '-q', '//depot/main/a.ts@=123']
     ])
+  })
+
+  it('does not download shelved Unreal asset contents for a text diff', async () => {
+    const run = vi.fn<PerforceRun>(async () => result('unexpected content'))
+
+    await expect(
+      new PerforceProvider(run).shelvedFileContent('C:\\work', '123', {
+        depotPath: '//depot/main/Character.uasset',
+        status: 'modified',
+        revision: '7',
+        fileType: 'binary+l'
+      })
+    ).resolves.toEqual({
+      originalContent: '',
+      modifiedContent: '',
+      originalIsBinary: true,
+      modifiedIsBinary: true
+    })
+    expect(run).not.toHaveBeenCalled()
   })
 
   it('treats Perforce no-change messages as an empty status', async () => {

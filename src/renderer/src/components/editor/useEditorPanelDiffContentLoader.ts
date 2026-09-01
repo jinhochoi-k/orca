@@ -104,12 +104,11 @@ export function useEditorPanelDiffContentLoader({
                       changelist: file.perforceShelf.changelist,
                       file: file.perforceShelf
                     })
-                    .then((content) => ({
-                      kind: 'text' as const,
-                      ...content,
-                      originalIsBinary: false,
-                      modifiedIsBinary: false
-                    }))
+                    .then((content) =>
+                      content.originalIsBinary || content.modifiedIsBinary
+                        ? { kind: 'binary' as const, ...content }
+                        : { kind: 'text' as const, ...content }
+                    )
                 : Promise.reject(new Error('Missing Perforce shelf metadata for diff tab.'))
               : effectiveDiffSource === 'commit'
                 ? commitCompare

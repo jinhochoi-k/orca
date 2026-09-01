@@ -7,6 +7,7 @@ import type {
   PerforceShelvedFileContent,
   PerforceStatusResult
 } from '../../shared/perforce-types'
+import { hasBinaryFileExtension } from '../../shared/binary-file-extensions'
 import {
   mapPerforceAction,
   parseP4TaggedOutput,
@@ -41,8 +42,19 @@ function parseShelvedFileRecords(output: string): Record<string, string>[] {
   return files.map(({ index, depotPath }) => ({
     depotFile: depotPath,
     action: record[`action${index}`] ?? '',
-    rev: record[`rev${index}`] ?? ''
+    rev: record[`rev${index}`] ?? '',
+    type: record[`type${index}`] ?? ''
   }))
+}
+
+function isBinaryShelvedFile(file: PerforceShelvedFile): boolean {
+  const fileType = file.fileType?.toLowerCase() ?? ''
+  return (
+    hasBinaryFileExtension(file.depotPath) ||
+    fileType.includes('binary') ||
+    fileType.includes('resource') ||
+    fileType.startsWith('apple')
+  )
 }
 
 export function extractShelvedFileDiff(output: string, depotPath: string): string {
@@ -171,7 +183,8 @@ export async function loadPerforceShelvedFiles(
   return parseShelvedFileRecords(output).map((record) => ({
     depotPath: record.depotFile,
     status: mapPerforceAction(record.action || '').status,
-    ...(record.rev ? { revision: record.rev } : {})
+    ...(record.rev ? { revision: record.rev } : {}),
+    ...(record.type ? { fileType: record.type } : {})
   }))
 }
 
@@ -204,6 +217,14 @@ export async function loadPerforceShelvedFileContent(
   if (file.status !== 'added' && revision === null) {
     throw new Error('Shelved file base revision is unavailable')
   }
+  if (isBinaryShelvedFile(file)) {
+    return {
+      originalContent: '',
+      modifiedContent: '',
+      originalIsBinary: file.status !== 'added',
+      modifiedIsBinary: file.status !== 'deleted'
+    }
+  }
   const [originalContent, modifiedContent] = await Promise.all([
     file.status === 'added'
       ? Promise.resolve('')
@@ -212,5 +233,10 @@ export async function loadPerforceShelvedFileContent(
       ? Promise.resolve('')
       : runPerforceChecked(run, worktreePath, ['print', '-q', `${depotPath}@=${id}`])
   ])
-  return { originalContent, modifiedContent }
+  return {
+    originalContent,
+    modifiedContent,
+    originalIsBinary: false,
+    modifiedIsBinary: false
+  }
 }

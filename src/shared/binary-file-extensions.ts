@@ -61,6 +61,8 @@ const NON_IMAGE_BINARY_EXTENSIONS = [
   '.so',
   '.sqlite',
   '.sqlite3',
+  '.uasset',
+  '.umap',
   '.wasm'
 ]
 
