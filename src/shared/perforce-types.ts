@@ -31,3 +31,26 @@ export type PerforceMutationResult = {
   changelist?: string
   error?: string
 }
+
+export type PerforceChangelist = {
+  id: string
+  description: string
+  files: PerforceFileEntry[]
+  user?: string
+  client?: string
+  modifiedAt?: number
+}
+
+export type PerforceChangelistsResult = {
+  changelists: PerforceChangelist[]
+  localChanges: PerforceFileEntry[]
+  client?: string
+  stream?: string
+  user?: string
+}
+
+export type PerforceShelvedFile = {
+  depotPath: string
+  status: GitFileStatus
+  revision?: string
+}

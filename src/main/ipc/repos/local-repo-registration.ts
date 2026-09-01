@@ -15,6 +15,17 @@ import { detectRepoIconAndUpstream } from '../../repo-icon-autodetect'
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
 import { PerforceProvider } from '../../perforce/provider'
 
+export function migrateExistingLocalFolderRepo(
+  store: Pick<Store, 'updateRepo'>,
+  existing: Repo,
+  requestedKind: RepoKind
+): Repo {
+  if (requestedKind !== 'perforce' || existing.kind !== 'folder') {
+    return existing
+  }
+  return store.updateRepo(existing.id, { kind: 'perforce' }) ?? existing
+}
+
 export async function addLocalRepoFromPath(
   store: Store,
   path: string,
@@ -41,7 +52,10 @@ export async function addLocalRepoFromPath(
     .getRepos()
     .find((repo) => !repo.connectionId && normalizeRuntimePathForComparison(repo.path) === pathKey)
   if (existing) {
-    return { repo: existing, alreadyExisted: true }
+    return {
+      repo: migrateExistingLocalFolderRepo(store, existing, repoKind),
+      alreadyExisted: true
+    }
   }
 
   const resolvedPathKey = normalizeRuntimePathForComparison(resolvedPath)

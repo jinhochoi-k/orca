@@ -3800,6 +3800,8 @@ const api = {
     info: (args: { worktreePath: string }) => ipcRenderer.invoke('perforce:info', args),
     status: (args: { worktreePath: string; includeUnopened?: boolean }) =>
       ipcRenderer.invoke('perforce:status', args),
+    changelists: (args: { worktreePath: string; includeUnopened?: boolean }) =>
+      ipcRenderer.invoke('perforce:changelists', args),
     diff: (args: { worktreePath: string; filePath: string }) =>
       ipcRenderer.invoke('perforce:diff', args),
     open: (args: { worktreePath: string; filePath: string }) =>
@@ -3810,6 +3812,14 @@ const api = {
       ipcRenderer.invoke('perforce:submit', args),
     shelve: (args: { worktreePath: string; message: string }) =>
       ipcRenderer.invoke('perforce:shelve', args),
+    createChangelist: (args: { worktreePath: string; description: string }) =>
+      ipcRenderer.invoke('perforce:create-changelist', args),
+    moveFiles: (args: { worktreePath: string; changelist: string; filePaths: string[] }) =>
+      ipcRenderer.invoke('perforce:move-files', args),
+    shelvedFiles: (args: { worktreePath: string; changelist: string }) =>
+      ipcRenderer.invoke('perforce:shelved-files', args),
+    shelvedDiff: (args: { worktreePath: string; changelist: string; depotPath: string }) =>
+      ipcRenderer.invoke('perforce:shelved-diff', args),
     sync: (args: { worktreePath: string }) => ipcRenderer.invoke('perforce:sync', args)
   },
 
