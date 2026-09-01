@@ -1,4 +1,7 @@
 import React from 'react'
+import { useActiveWorktree, useRepoById } from '@/store/selectors'
+import { isPerforceRepoKind } from '../../../../shared/repo-kind'
+import { PerforceSourceControlPanel } from './source-control/perforce-panel'
 import { SourceControlPanel } from './source-control/panel/panel'
 
 export { HostedReviewHeaderLink } from './source-control/review/hosted-review-header-chrome'
@@ -55,6 +58,11 @@ export {
 } from './source-control/ai/text-generation-defaults'
 
 function SourceControlInner(): React.JSX.Element {
+  const activeWorktree = useActiveWorktree()
+  const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
+  if (activeWorktree && activeRepo && isPerforceRepoKind(activeRepo)) {
+    return <PerforceSourceControlPanel worktreePath={activeWorktree.path} />
+  }
   return <SourceControlPanel />
 }
 const SourceControl = React.memo(SourceControlInner)

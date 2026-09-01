@@ -84,10 +84,10 @@ function getOptionalRepoKind(flags: Map<string, string | boolean>): RepoKind | u
   if (kind === undefined) {
     return undefined
   }
-  if (kind === 'git' || kind === 'folder') {
+  if (kind === 'git' || kind === 'perforce' || kind === 'folder') {
     return kind
   }
-  throw new RuntimeClientError('invalid_argument', '--kind must be git or folder')
+  throw new RuntimeClientError('invalid_argument', '--kind must be git, perforce, or folder')
 }
 
 export const PROJECT_HANDLERS: Record<string, CommandHandler> = {

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '@/store'
 import type { Repo } from '../../../../shared/repo-types'
-import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { hasSourceControl } from '../../../../shared/repo-kind'
 import { finishProjectAddWithDefaultCheckout } from './project-added-default-checkout'
 import { translate } from '@/i18n/i18n'
 import { upsertAddedRepoWithProjectHostSetup } from './add-repo-store-upsert'
@@ -108,7 +108,7 @@ const AddProjectFromFolderDialog = React.memo(function AddProjectFromFolderDialo
       if (!repo) {
         return
       }
-      if (!isGitRepoKind(repo)) {
+      if (!hasSourceControl(repo)) {
         openNonGitConfirmation()
         return
       }

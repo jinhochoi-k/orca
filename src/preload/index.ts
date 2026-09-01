@@ -65,6 +65,7 @@ import { docPreviewApi } from './api/doc-preview-bridge'
 import { notebookApi } from './api/notebook-bridge'
 import { fsApi } from './api/fs-bridge'
 import { gitApi } from './api/git-bridge'
+import { perforceApi } from './api/perforce-bridge'
 import { uiApi } from './api/ui-bridge'
 import { statsApi } from './api/stats-bridge'
 import { memoryApi } from './api/memory-bridge'
@@ -163,6 +164,7 @@ const api = {
   notebook: notebookApi,
   fs: fsApi,
   git: gitApi,
+  perforce: perforceApi,
   ui: uiApi,
   stats: statsApi,
   memory: memoryApi,

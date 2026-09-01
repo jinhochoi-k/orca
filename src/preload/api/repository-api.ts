@@ -22,7 +22,12 @@ import type {
   ProjectHostSetupUpdateResult,
   ProjectUpdateArgs
 } from '../../shared/project-types'
-import type { BaseRefDefaultResult, BaseRefSearchResult, Repo } from '../../shared/repo-types'
+import type {
+  BaseRefDefaultResult,
+  BaseRefSearchResult,
+  Repo,
+  RepoKind
+} from '../../shared/repo-types'
 
 export type RepositoryApi = {
   list: () => Promise<Repo[]>
@@ -30,7 +35,7 @@ export type RepositoryApi = {
   // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
   add: (args: {
     path: string
-    kind?: 'git' | 'folder'
+    kind?: RepoKind
     displayName?: string
   }) => Promise<{ repo: Repo } | { error: string }>
   remove: (args: { repoId: string }) => Promise<void>

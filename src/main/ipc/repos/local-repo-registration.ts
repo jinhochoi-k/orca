@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Store } from '../../persistence'
-import type { Repo } from '../../../shared/repo-types'
+import type { Repo, RepoKind } from '../../../shared/repo-types'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../../shared/constants'
 import { normalizeRuntimePathForComparison } from '../../../shared/cross-platform-path'
@@ -13,19 +13,26 @@ import {
 } from '../../git/repo'
 import { detectRepoIconAndUpstream } from '../../repo-icon-autodetect'
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
+import { PerforceProvider } from '../../perforce/provider'
 
 export async function addLocalRepoFromPath(
   store: Store,
   path: string,
-  kind: 'git' | 'folder' = 'git',
+  kind: RepoKind = 'git',
   displayName?: string
 ): Promise<{ repo: Repo; alreadyExisted: boolean } | { error: string }> {
-  const repoKind = kind === 'folder' ? 'folder' : 'git'
+  const repoKind: RepoKind = kind === 'folder' ? 'folder' : kind === 'perforce' ? 'perforce' : 'git'
   if (repoKind === 'git') {
     await awaitWindowsHostGitEnvironmentReady({ cwd: path })
   }
   if (repoKind === 'git' && !isGitRepo(path)) {
     return { error: `Not a valid git repository: ${path}` }
+  }
+  if (repoKind === 'perforce') {
+    const info = await new PerforceProvider().info(path)
+    if (!info.available || !info.isWorkspace) {
+      return { error: info.error || `Not a valid Perforce client workspace: ${path}` }
+    }
   }
 
   const resolvedPath = repoKind === 'git' ? getGitRepoRoot(path) : path

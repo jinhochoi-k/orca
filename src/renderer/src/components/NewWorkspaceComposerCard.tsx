@@ -22,6 +22,7 @@ import {
 } from '../../../shared/tui-agent-selection'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import { getRepoKind } from '../../../shared/repo-kind'
 import { NewWorkspaceComposerAdvancedSection } from './new-workspace/NewWorkspaceComposerAdvancedSection'
 import { NewWorkspaceComposerAgentSection } from './new-workspace/NewWorkspaceComposerAgentSection'
 import { NewWorkspaceComposerFooter } from './new-workspace/NewWorkspaceComposerFooter'
@@ -322,7 +323,9 @@ export default function NewWorkspaceComposerCard(
       <SetProjectLocationDialog
         option={setLocationOption}
         projectName={selectedProjectName}
-        projectKind={selectedRepoIsGit ? 'git' : 'folder'}
+        projectKind={
+          selectedRepo ? getRepoKind(selectedRepo) : selectedRepoIsGit ? 'git' : 'folder'
+        }
         defaultCloneUrl={defaultCloneUrl}
         onClose={handleSetLocationClose}
         onReady={handleSetLocationReady}

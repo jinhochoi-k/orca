@@ -73,6 +73,12 @@ export function ExistingFolderForm({
           <SelectItem value="git">
             {translate('auto.components.settings.RepositoryPane.setupKindGit', 'Git repo')}
           </SelectItem>
+          <SelectItem value="perforce">
+            {translate(
+              'auto.components.settings.RepositoryPane.setupKindPerforce',
+              'Perforce workspace'
+            )}
+          </SelectItem>
           <SelectItem value="folder">
             {translate('auto.components.settings.RepositoryPane.setupKindFolder', 'Folder')}
           </SelectItem>
