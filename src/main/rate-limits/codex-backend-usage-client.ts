@@ -115,7 +115,9 @@ export async function supplementCodexSessionWindow(
   request: CodexBackendRequest,
   options?: CodexRateLimitFetchOptions
 ): Promise<ProviderRateLimits> {
-  if (options?.signal?.aborted || limits.session || !limits.weekly) {
+  // A plan billed by spend control reports no windows at all over RPC, so a
+  // missing weekly is exactly the case the backend probe has to answer.
+  if (options?.signal?.aborted || limits.session) {
     return limits
   }
   try {
@@ -124,15 +126,17 @@ export async function supplementCodexSessionWindow(
       return limits
     }
     const rateLimitResetCredits = backend.rateLimitResetCredits ?? limits.rateLimitResetCredits
-    if (!backend.session) {
+    const buckets = backend.buckets ?? limits.buckets
+    if (!backend.session && !backend.buckets) {
       return rateLimitResetCredits === limits.rateLimitResetCredits
         ? limits
         : { ...limits, rateLimitResetCredits }
     }
     return {
       ...limits,
-      session: backend.session,
+      session: backend.session ?? limits.session,
       weekly: backend.weekly ?? limits.weekly,
+      ...(buckets ? { buckets } : {}),
       planType: backend.planType ?? limits.planType,
       ...(rateLimitResetCredits !== undefined ? { rateLimitResetCredits } : {}),
       updatedAt: backend.updatedAt
