@@ -49,6 +49,9 @@ function renderOverlay({
   onRenameSubmit = vi.fn(),
   canContinueAgentSessionInNewSession = false,
   onContinueAgentSessionInNewSession = vi.fn(),
+  canToggleNativeChat = false,
+  isChatViewMode = false,
+  onToggleNativeChat = vi.fn(),
   renameValue = '',
   renamingPaneId = null
 }: {
@@ -61,6 +64,9 @@ function renderOverlay({
   onRenameSubmit?: ReturnType<typeof vi.fn>
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: ReturnType<typeof vi.fn>
+  canToggleNativeChat?: boolean
+  isChatViewMode?: boolean
+  onToggleNativeChat?: ReturnType<typeof vi.fn>
   renameValue?: string
   renamingPaneId?: number | null
 }): {
@@ -68,6 +74,7 @@ function renderOverlay({
   onClosePane: ReturnType<typeof vi.fn>
   onRemoveTitle: ReturnType<typeof vi.fn>
   onRenameSubmit: ReturnType<typeof vi.fn>
+  onToggleNativeChat: ReturnType<typeof vi.fn>
 } {
   const panes = [makePane(1), makePane(2)]
   const container = document.createElement('div')
@@ -98,6 +105,9 @@ function renderOverlay({
         hiddenStartupStyle={{}}
         managerRef={{ current: null } as RefObject<PaneManager | null>}
         paneTransportsRef={{ current: new Map() } as RefObject<Map<number, PtyTransport>>}
+        canToggleNativeChat={canToggleNativeChat}
+        isChatViewMode={isChatViewMode}
+        onToggleNativeChat={onToggleNativeChat as () => void}
         canContinueAgentSessionInNewSession={canContinueAgentSessionInNewSession}
         onContinueAgentSessionInNewSession={
           onContinueAgentSessionInNewSession as (pane: ManagedPane) => void
@@ -117,7 +127,7 @@ function renderOverlay({
     )
   })
   mounted.push({ container, root })
-  return { container, onClosePane, onRemoveTitle, onRenameSubmit }
+  return { container, onClosePane, onRemoveTitle, onRenameSubmit, onToggleNativeChat }
 }
 
 function pressInputKey(
@@ -223,5 +233,37 @@ describe('TerminalPaneHeaderOverlay', () => {
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledWith(
       expect.objectContaining({ id: 1 })
     )
+  })
+
+  it('offers the chat view switch on the active pane only', () => {
+    const { container, onToggleNativeChat } = renderOverlay({
+      paneTitles: { 1: '', 2: '' },
+      canToggleNativeChat: true
+    })
+    const toggles = container.querySelectorAll<HTMLButtonElement>(
+      'button[aria-label="Show chat view"]'
+    )
+
+    expect(toggles).toHaveLength(1)
+    act(() => toggles[0]?.click())
+
+    expect(onToggleNativeChat).toHaveBeenCalledOnce()
+  })
+
+  it('offers the way back to the terminal while the pane shows chat', () => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: '', 2: '' },
+      canToggleNativeChat: true,
+      isChatViewMode: true
+    })
+
+    expect(container.querySelector('button[aria-label="Show terminal"]')).not.toBeNull()
+    expect(container.querySelector('button[aria-label="Show chat view"]')).toBeNull()
+  })
+
+  it('hides the switch on panes that cannot render chat', () => {
+    const { container } = renderOverlay({ paneTitles: { 1: '', 2: '' } })
+
+    expect(container.querySelector('button[aria-label="Show chat view"]')).toBeNull()
   })
 })
