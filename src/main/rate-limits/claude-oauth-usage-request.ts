@@ -2,6 +2,7 @@ import { net, session } from 'electron'
 import type { ProviderRateLimits, RateLimitWindow } from '../../shared/rate-limit-types'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 import { createOAuthUsageError } from './claude-oauth-usage-error'
+import { mapClaudeSpendBucket, type ClaudeSpendUsageInput } from './claude-spend-usage'
 import { mapClaudeUsageWindow, type ClaudeUsageWindowInput } from './claude-usage-window'
 import { abortedClaudeRateLimitResult } from './claude-usage-result'
 
@@ -23,7 +24,7 @@ type OAuthUsageResponse = {
   fable_seven_day?: ClaudeUsageWindowInput
   seven_day_fable?: ClaudeUsageWindowInput
   limits?: OAuthUsageLimit[] | null
-}
+} & ClaudeSpendUsageInput
 
 async function ensureProxyFromEnvironment(): Promise<void> {
   await ensureElectronProxyFromEnvironment({
@@ -85,11 +86,19 @@ export async function fetchClaudeOAuthUsage(
     if (signal?.aborted) {
       return abortedClaudeRateLimitResult()
     }
+    const session = mapClaudeUsageWindow(data.five_hour, 300)
+    const weekly = mapClaudeUsageWindow(data.seven_day, 10080)
+    const fableWeekly = mapFableWeeklyWindow(data)
+    const spendBucket = mapClaudeSpendBucket(
+      data,
+      session !== null || weekly !== null || fableWeekly !== null
+    )
     return {
       provider: 'claude',
-      session: mapClaudeUsageWindow(data.five_hour, 300),
-      weekly: mapClaudeUsageWindow(data.seven_day, 10080),
-      fableWeekly: mapFableWeeklyWindow(data),
+      session,
+      weekly,
+      fableWeekly,
+      ...(spendBucket ? { buckets: [spendBucket] } : {}),
       updatedAt: Date.now(),
       error: null,
       status: 'ok'
