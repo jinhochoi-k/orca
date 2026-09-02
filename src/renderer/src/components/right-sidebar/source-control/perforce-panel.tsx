@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
+import { isBinaryPerforceFile } from '../../../../../shared/perforce-file-type'
 import type {
   PerforceChangelistsResult,
   PerforceFileEntry,
@@ -12,7 +13,7 @@ import type {
 import type { Repo } from '../../../../../shared/repo-types'
 import { PerforceChangelistSection, PerforceLocalChanges } from './perforce-changelist-section'
 import { PerforceCreateChangelistDialog } from './perforce-create-changelist-dialog'
-import { PerforceDiffDialog, type PerforceDiff } from './perforce-diff-dialog'
+import { openPerforceOpenedDiffTab } from './open-perforce-opened-diff'
 import { PerforceToolbarMenu } from './perforce-toolbar-menu'
 import { openPerforceShelvedDiffTab } from './open-perforce-shelved-diff'
 
@@ -32,7 +33,6 @@ export function PerforceSourceControlPanel({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mutation, setMutation] = useState<string | null>(null)
-  const [diff, setDiff] = useState<PerforceDiff | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [shelvedByChange, setShelvedByChange] = useState<Record<string, PerforceShelvedFile[]>>({})
 
@@ -75,20 +75,16 @@ export function PerforceSourceControlPanel({
   )
 
   const openDiff = useCallback(
-    async (entry: PerforceFileEntry) => {
-      setMutation(entry.path)
-      try {
-        const content = await window.api.perforce.diff({ worktreePath, filePath: entry.path })
-        setDiff({ path: entry.path, content: content || 'No textual diff is available.' })
-      } catch (caught) {
-        toast.error('Failed to load diff', {
-          description: caught instanceof Error ? caught.message : String(caught)
+    (entry: PerforceFileEntry) => {
+      if (isBinaryPerforceFile(entry.path, entry.fileType)) {
+        toast.info('Diff preview unavailable', {
+          description: `${entry.path} is stored as a binary Perforce file.`
         })
-      } finally {
-        setMutation(null)
+        return
       }
+      openPerforceOpenedDiffTab(openFile, { entry, worktreeId, worktreePath })
     },
-    [worktreePath]
+    [openFile, worktreeId, worktreePath]
   )
 
   const moveFile = useCallback(
@@ -216,7 +212,7 @@ export function PerforceSourceControlPanel({
                 shelvedFiles={shelvedByChange[changelist.id]}
                 shelvedLoading={mutation === `shelved:${changelist.id}`}
                 busyPath={mutation}
-                onDiff={(entry) => void openDiff(entry)}
+                onDiff={openDiff}
                 onMove={moveFile}
                 onLoadShelved={() => void loadShelved(changelist.id)}
                 onShelvedDiff={(entry) => void openShelvedDiff(changelist.id, entry)}
@@ -226,7 +222,7 @@ export function PerforceSourceControlPanel({
               entries={data.localChanges}
               changelists={data.changelists}
               busyPath={mutation}
-              onDiff={(entry) => void openDiff(entry)}
+              onDiff={openDiff}
               onMove={moveFile}
             />
           </>
@@ -239,7 +235,6 @@ export function PerforceSourceControlPanel({
         onOpenChange={setCreateOpen}
         onCreate={(description) => void createChangelist(description)}
       />
-      <PerforceDiffDialog diff={diff} onOpenChange={(open) => !open && setDiff(null)} />
     </div>
   )
 }

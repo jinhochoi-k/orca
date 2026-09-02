@@ -6,6 +6,8 @@ export type PerforceFileEntry = {
   area: GitStagingArea
   changelist?: string
   depotPath?: string
+  revision?: string
+  fileType?: string
 }
 
 export type PerforceStatusResult = {
@@ -62,3 +64,5 @@ export type PerforceShelvedFileContent = {
   originalIsBinary: boolean
   modifiedIsBinary: boolean
 }
+
+export type PerforceOpenedFileContent = PerforceShelvedFileContent

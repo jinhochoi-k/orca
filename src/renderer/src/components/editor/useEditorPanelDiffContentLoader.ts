@@ -9,6 +9,7 @@ import {
   getRuntimeGitDiff,
   getRuntimeGitScope
 } from '@/runtime/runtime-git-client'
+import type { PerforceOpenedFileContent } from '../../../../shared/perforce-types'
 import type { DiffContent, InFlightContentRead } from './editor-panel-content-types'
 import { canUseChangesModeForFile } from './editor-panel-file-mode'
 import type { EditorPanelContentLoadOptions } from './useEditorPanelExternalContentEvents'
@@ -43,7 +44,45 @@ function inFlightDiffKey(
   const shelf = file.perforceShelf
     ? `${file.perforceShelf.changelist}::${file.perforceShelf.depotPath}::${file.perforceShelf.revision ?? ''}`
     : ''
-  return `${connectionId ?? ''}::${file.diffSource ?? ''}::${compareAgainstHead ? 'head' : 'default'}::${file.filePath}::${branch}::${commit}::${shelf}`
+  const opened = file.perforceOpened
+    ? `${file.perforceOpened.changelist ?? 'default'}::${file.perforceOpened.depotPath ?? ''}::${file.perforceOpened.revision ?? ''}`
+    : ''
+  return `${connectionId ?? ''}::${file.diffSource ?? ''}::${compareAgainstHead ? 'head' : 'default'}::${file.filePath}::${branch}::${commit}::${shelf}::${opened}`
+}
+
+function toPerforceDiffContent(content: PerforceOpenedFileContent): DiffContent {
+  if (content.originalIsBinary) {
+    return { kind: 'binary', ...content, originalIsBinary: true }
+  }
+  if (content.modifiedIsBinary) {
+    return { kind: 'binary', ...content, originalIsBinary: false, modifiedIsBinary: true }
+  }
+  return { kind: 'text', ...content, originalIsBinary: false, modifiedIsBinary: false }
+}
+
+function loadPerforceDiffContent(file: OpenFile): Promise<DiffContent> | null {
+  if (file.diffSource === 'perforce-opened') {
+    return file.perforceOpened
+      ? window.api.perforce
+          .openedFileContent({
+            worktreePath: file.perforceOpened.worktreePath,
+            file: file.perforceOpened
+          })
+          .then(toPerforceDiffContent)
+      : Promise.reject(new Error('Missing opened Perforce file metadata for diff tab.'))
+  }
+  if (file.diffSource === 'perforce-shelved') {
+    return file.perforceShelf
+      ? window.api.perforce
+          .shelvedFileContent({
+            worktreePath: file.perforceShelf.worktreePath,
+            changelist: file.perforceShelf.changelist,
+            file: file.perforceShelf
+          })
+          .then(toPerforceDiffContent)
+      : Promise.reject(new Error('Missing Perforce shelf metadata for diff tab.'))
+  }
+  return null
 }
 
 export function useEditorPanelDiffContentLoader({
@@ -95,71 +134,57 @@ export function useEditorPanelDiffContentLoader({
         }
         let pending = inFlightDiffReads.get(key)
         if (!pending) {
-          const promise = (
-            effectiveDiffSource === 'perforce-shelved'
-              ? file.perforceShelf
-                ? window.api.perforce
-                    .shelvedFileContent({
-                      worktreePath: file.perforceShelf.worktreePath,
-                      changelist: file.perforceShelf.changelist,
-                      file: file.perforceShelf
-                    })
-                    .then((content) =>
-                      content.originalIsBinary || content.modifiedIsBinary
-                        ? { kind: 'binary' as const, ...content }
-                        : { kind: 'text' as const, ...content }
-                    )
-                : Promise.reject(new Error('Missing Perforce shelf metadata for diff tab.'))
-              : effectiveDiffSource === 'commit'
-                ? commitCompare
-                  ? getRuntimeGitCommitDiff(
-                      {
-                        settings: fileSettings,
-                        worktreeId: file.worktreeId,
-                        worktreePath,
-                        connectionId
+          const promise =
+            loadPerforceDiffContent({ ...file, diffSource: effectiveDiffSource }) ??
+            (effectiveDiffSource === 'commit'
+              ? commitCompare
+                ? getRuntimeGitCommitDiff(
+                    {
+                      settings: fileSettings,
+                      worktreeId: file.worktreeId,
+                      worktreePath,
+                      connectionId
+                    },
+                    {
+                      commitOid: commitCompare.commitOid,
+                      parentOid: commitCompare.parentOid,
+                      filePath: file.relativePath,
+                      oldPath: file.branchOldPath
+                    }
+                  )
+                : Promise.reject(new Error('Missing commit comparison for diff tab.'))
+              : effectiveDiffSource === 'branch' && branchCompare
+                ? getRuntimeGitBranchDiff(
+                    {
+                      settings: fileSettings,
+                      worktreeId: file.worktreeId,
+                      worktreePath,
+                      connectionId
+                    },
+                    {
+                      compare: {
+                        baseRef: branchCompare.baseRef,
+                        baseOid: branchCompare.baseOid!,
+                        headOid: branchCompare.headOid!,
+                        mergeBase: branchCompare.mergeBase!
                       },
-                      {
-                        commitOid: commitCompare.commitOid,
-                        parentOid: commitCompare.parentOid,
-                        filePath: file.relativePath,
-                        oldPath: file.branchOldPath
-                      }
-                    )
-                  : Promise.reject(new Error('Missing commit comparison for diff tab.'))
-                : effectiveDiffSource === 'branch' && branchCompare
-                  ? getRuntimeGitBranchDiff(
-                      {
-                        settings: fileSettings,
-                        worktreeId: file.worktreeId,
-                        worktreePath,
-                        connectionId
-                      },
-                      {
-                        compare: {
-                          baseRef: branchCompare.baseRef,
-                          baseOid: branchCompare.baseOid!,
-                          headOid: branchCompare.headOid!,
-                          mergeBase: branchCompare.mergeBase!
-                        },
-                        filePath: file.relativePath,
-                        oldPath: file.branchOldPath
-                      }
-                    )
-                  : getRuntimeGitDiff(
-                      {
-                        settings: fileSettings,
-                        worktreeId: file.worktreeId,
-                        worktreePath,
-                        connectionId
-                      },
-                      {
-                        filePath: file.relativePath,
-                        staged: effectiveDiffSource === 'staged',
-                        compareAgainstHead
-                      }
-                    )
-          ) as Promise<DiffContent>
+                      filePath: file.relativePath,
+                      oldPath: file.branchOldPath
+                    }
+                  )
+                : getRuntimeGitDiff(
+                    {
+                      settings: fileSettings,
+                      worktreeId: file.worktreeId,
+                      worktreePath,
+                      connectionId
+                    },
+                    {
+                      filePath: file.relativePath,
+                      staged: effectiveDiffSource === 'staged',
+                      compareAgainstHead
+                    }
+                  ))
           pending = { externalEventGeneration: options?.externalEventGeneration, promise }
           inFlightDiffReads.set(key, pending)
           queueMicrotask(() => {

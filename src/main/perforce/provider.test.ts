@@ -86,8 +86,10 @@ describe('PerforceProvider', () => {
           [
             '... depotFile //depot/main/a.ts',
             '... clientFile //jinho_ws/a.ts',
+            '... haveRev 12',
             '... action edit',
-            '... change default'
+            '... change default',
+            '... type text'
           ].join('\n')
         )
       }
@@ -116,7 +118,9 @@ describe('PerforceProvider', () => {
         status: 'modified',
         area: 'staged',
         changelist: 'default',
-        depotPath: '//depot/main/a.ts'
+        depotPath: '//depot/main/a.ts',
+        revision: '12',
+        fileType: 'text'
       },
       {
         path: 'new.ts',
@@ -234,6 +238,54 @@ describe('PerforceProvider', () => {
       ['print', '-q', '//depot/main/a.ts#7'],
       ['print', '-q', '//depot/main/a.ts@=123']
     ])
+  })
+
+  it('loads full base and local content for opened editor diff tabs', async () => {
+    const run = vi.fn<PerforceRun>(async () => result('base content'))
+    const readTextFile = vi.fn(async () => 'local content')
+
+    await expect(
+      new PerforceProvider(run, readTextFile).openedFileContent('C:\\work', {
+        path: 'a.ts',
+        depotPath: '//depot/main/a.ts',
+        revision: '7',
+        fileType: 'text',
+        status: 'modified',
+        area: 'staged'
+      })
+    ).resolves.toEqual({
+      originalContent: 'base content',
+      modifiedContent: 'local content',
+      originalIsBinary: false,
+      modifiedIsBinary: false
+    })
+    expect(run).toHaveBeenCalledWith(['print', '-q', '//depot/main/a.ts#7'], {
+      cwd: 'C:\\work'
+    })
+    expect(readTextFile).toHaveBeenCalledWith('C:\\work\\a.ts', 'utf8')
+  })
+
+  it('does not read opened binary file contents for a text diff', async () => {
+    const run = vi.fn<PerforceRun>(async () => result('unexpected content'))
+    const readTextFile = vi.fn(async () => 'unexpected content')
+
+    await expect(
+      new PerforceProvider(run, readTextFile).openedFileContent('C:\\work', {
+        path: 'Character.uasset',
+        depotPath: '//depot/main/Character.uasset',
+        revision: '7',
+        fileType: 'binary+l',
+        status: 'modified',
+        area: 'staged'
+      })
+    ).resolves.toEqual({
+      originalContent: '',
+      modifiedContent: '',
+      originalIsBinary: true,
+      modifiedIsBinary: true
+    })
+    expect(run).not.toHaveBeenCalled()
+    expect(readTextFile).not.toHaveBeenCalled()
   })
 
   it('does not download shelved Unreal asset contents for a text diff', async () => {

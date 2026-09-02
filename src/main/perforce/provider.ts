@@ -5,6 +5,7 @@ import type {
   PerforceFileEntry,
   PerforceInfoResult,
   PerforceMutationResult,
+  PerforceOpenedFileContent,
   PerforceShelvedFile,
   PerforceStatusResult
 } from '../../shared/perforce-types'
@@ -18,6 +19,7 @@ import {
   loadPerforceShelvedFiles,
   movePerforceFiles
 } from './changelist-operations'
+import { loadPerforceOpenedFileContent, type PerforceReadTextFile } from './opened-file-content'
 import {
   isPathInsideOrEqual,
   mapPerforceAction,
@@ -72,12 +74,17 @@ function entryFromRecord(
     status: mapped.status,
     area: opened ? 'staged' : mapped.status === 'added' ? 'untracked' : 'unstaged',
     ...(record.change ? { changelist: record.change } : {}),
-    ...(record.depotFile ? { depotPath: record.depotFile } : {})
+    ...(record.depotFile ? { depotPath: record.depotFile } : {}),
+    ...(record.haveRev || record.rev ? { revision: record.haveRev || record.rev } : {}),
+    ...(record.type ? { fileType: record.type } : {})
   }
 }
 
 export class PerforceProvider {
-  constructor(private readonly run: PerforceRun = defaultRun) {}
+  constructor(
+    private readonly run: PerforceRun = defaultRun,
+    private readonly readTextFile?: PerforceReadTextFile
+  ) {}
 
   async info(worktreePath: string): Promise<PerforceInfoResult> {
     let result: Awaited<ReturnType<PerforceRun>>
@@ -187,6 +194,13 @@ export class PerforceProvider {
 
   async shelvedFileContent(worktreePath: string, changelist: string, file: PerforceShelvedFile) {
     return loadPerforceShelvedFileContent(this.run, worktreePath, changelist, file)
+  }
+
+  async openedFileContent(
+    worktreePath: string,
+    file: PerforceFileEntry
+  ): Promise<PerforceOpenedFileContent> {
+    return loadPerforceOpenedFileContent(this.run, worktreePath, file, this.readTextFile)
   }
 
   async diff(worktreePath: string, filePath: string): Promise<string> {

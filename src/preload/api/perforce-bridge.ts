@@ -6,6 +6,7 @@ export const perforceApi: PerforceApi = {
   status: (args) => ipcRenderer.invoke('perforce:status', args),
   changelists: (args) => ipcRenderer.invoke('perforce:changelists', args),
   diff: (args) => ipcRenderer.invoke('perforce:diff', args),
+  openedFileContent: (args) => ipcRenderer.invoke('perforce:opened-file-content', args),
   open: (args) => ipcRenderer.invoke('perforce:open', args),
   revert: (args) => ipcRenderer.invoke('perforce:revert', args),
   submit: (args) => ipcRenderer.invoke('perforce:submit', args),

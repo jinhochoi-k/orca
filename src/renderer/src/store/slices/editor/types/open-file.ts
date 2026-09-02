@@ -12,13 +12,17 @@ import type {
   GitConflictStatusSource,
   GitStatusEntry
 } from '../../../../../../shared/git-status-types'
-import type { PerforceShelvedFile } from '../../../../../../shared/perforce-types'
+import type {
+  PerforceFileEntry,
+  PerforceShelvedFile
+} from '../../../../../../shared/perforce-types'
 
 export type DiffSource =
   | 'unstaged'
   | 'staged'
   | 'branch'
   | 'commit'
+  | 'perforce-opened'
   | 'perforce-shelved'
   | 'combined-all'
   | 'combined-uncommitted'
@@ -109,6 +113,7 @@ export type OpenFile = {
   branchCompare?: BranchCompareSnapshot
   commitCompare?: CommitCompareSnapshot
   perforceShelf?: PerforceShelvedFile & { changelist: string; worktreePath: string }
+  perforceOpened?: PerforceFileEntry & { worktreePath: string }
   branchOldPath?: string
   combinedAlternate?: CombinedDiffAlternate
   combinedAreaFilter?: string // filter combined diff to a specific area (e.g. 'staged', 'unstaged', 'untracked')

@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import type { Store } from '../persistence'
 import { PerforceProvider } from '../perforce/provider'
 import { getPerforceSubmitPolicy } from '../perforce/submit-policy'
-import type { PerforceShelvedFile } from '../../shared/perforce-types'
+import type { PerforceFileEntry, PerforceShelvedFile } from '../../shared/perforce-types'
 
 export function registerPerforceHandlers(store: Store, provider = new PerforceProvider()): void {
   ipcMain.handle('perforce:info', (_event, args: { worktreePath: string }) =>
@@ -20,6 +20,11 @@ export function registerPerforceHandlers(store: Store, provider = new PerforcePr
   )
   ipcMain.handle('perforce:diff', (_event, args: { worktreePath: string; filePath: string }) =>
     provider.diff(args.worktreePath, args.filePath)
+  )
+  ipcMain.handle(
+    'perforce:opened-file-content',
+    (_event, args: { worktreePath: string; file: PerforceFileEntry }) =>
+      provider.openedFileContent(args.worktreePath, args.file)
   )
   ipcMain.handle('perforce:open', (_event, args: { worktreePath: string; filePath: string }) =>
     provider.open(args.worktreePath, args.filePath)
