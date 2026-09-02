@@ -79,7 +79,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     )
   )
   const setTabViewMode = useAppStore((store) => store.setTabViewMode)
-  const toggleTabViewMode = useAppStore((store) => store.toggleTabViewMode)
   const savedLayout = useAppStore((store) => store.terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT)
   const terminalTab = useAppStore((store) =>
     getCachedTerminalTabForWorktree(store.tabsByWorktree, worktreeId, tabId)
@@ -217,31 +216,29 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     onAgentExitedRef.current = handleConfirmedAgentExit
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- Preserve the pre-split dependency contract.
   }, [handleConfirmedAgentExit])
-  const canToggleChatForLeaf = useCallback(
-    (leafId: string | null): boolean => {
-      // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.
-      const isChatViewForLeaf = effectiveChatViewMode && leafId !== null && chatLeafId === leafId
-      return (nativeChatEnabled && isChatViewForLeaf) || isChatEligibleForLeaf(leafId)
-    },
-    [chatLeafId, effectiveChatViewMode, isChatEligibleForLeaf, nativeChatEnabled]
-  )
-  const toggleNativeChatForLeaf = useCallback(
-    (leafId: string) => {
-      if (!unifiedTabId) {
-        return
-      }
-      if (effectiveChatViewMode && chatLeafId === leafId) {
-        setChatLeafId(null)
-        toggleTabViewMode(unifiedTabId)
-        return
-      }
-      setChatLeafId(leafId)
-      if (!effectiveChatViewMode) {
-        toggleTabViewMode(unifiedTabId)
-      }
-    },
-    [unifiedTabId, effectiveChatViewMode, chatLeafId, setChatLeafId, toggleTabViewMode]
-  )
+  // Plain functions, not hooks: TerminalPane's render hook order is locked by a
+  // parity ratchet, and neither of these reaches a dependency array.
+  const canToggleChatForLeaf = (leafId: string | null): boolean => {
+    // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.
+    const isChatViewForLeaf = effectiveChatViewMode && leafId !== null && chatLeafId === leafId
+    return (nativeChatEnabled && isChatViewForLeaf) || isChatEligibleForLeaf(leafId)
+  }
+  const toggleNativeChatForLeaf = (leafId: string): void => {
+    if (!unifiedTabId) {
+      return
+    }
+    // Read the action at call time so the switch does not add a store subscription.
+    const { toggleTabViewMode } = useAppStore.getState()
+    if (effectiveChatViewMode && chatLeafId === leafId) {
+      setChatLeafId(null)
+      toggleTabViewMode(unifiedTabId)
+      return
+    }
+    setChatLeafId(leafId)
+    if (!effectiveChatViewMode) {
+      toggleTabViewMode(unifiedTabId)
+    }
+  }
   const switchNativeChatToTerminal = useCallback(() => {
     if (chatLeafId && unifiedTabId) {
       setChatLeafId(null)
