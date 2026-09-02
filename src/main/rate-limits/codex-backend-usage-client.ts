@@ -14,6 +14,7 @@ import {
 import type { CodexRateLimitFetchOptions } from './codex-rate-limit-fetch-options'
 import { mapCodexRateLimitWindow } from './codex-rate-limit-window-mapper'
 import { mapBackendRateLimitResetCredits } from './codex-reset-credit-client'
+import { mapCodexSpendBucket, type CodexSpendControl } from './codex-spend-usage'
 
 type BackendRateLimitWindow = {
   used_percent?: number
@@ -28,6 +29,7 @@ type BackendUsageResponse = {
     secondary_window?: BackendRateLimitWindow | null
   } | null
   rate_limit_reset_credits?: Parameters<typeof mapBackendRateLimitResetCredits>[0]
+  spend_control?: CodexSpendControl
 }
 
 function backendWindowToSnapshot(
@@ -78,16 +80,23 @@ export async function fetchCodexRateLimitsViaBackend(
     primary: backendWindowToSnapshot(payload.rate_limit?.primary_window),
     secondary: backendWindowToSnapshot(payload.rate_limit?.secondary_window)
   })
+  const session = mapCodexRateLimitWindow(
+    classified.session,
+    snapshotWindowMinutes(classified.session, CODEX_SESSION_WINDOW_MINUTES)
+  )
+  const weekly = mapCodexRateLimitWindow(
+    classified.weekly,
+    snapshotWindowMinutes(classified.weekly, CODEX_WEEKLY_WINDOW_MINUTES)
+  )
+  const spendBucket = mapCodexSpendBucket(
+    payload.spend_control ?? null,
+    session !== null || weekly !== null
+  )
   return {
     provider: 'codex',
-    session: mapCodexRateLimitWindow(
-      classified.session,
-      snapshotWindowMinutes(classified.session, CODEX_SESSION_WINDOW_MINUTES)
-    ),
-    weekly: mapCodexRateLimitWindow(
-      classified.weekly,
-      snapshotWindowMinutes(classified.weekly, CODEX_WEEKLY_WINDOW_MINUTES)
-    ),
+    session,
+    weekly,
+    ...(spendBucket ? { buckets: [spendBucket] } : {}),
     planType: payload.plan_type,
     ...(payload.rate_limit_reset_credits !== undefined
       ? {
