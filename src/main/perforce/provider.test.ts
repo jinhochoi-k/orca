@@ -85,7 +85,7 @@ describe('PerforceProvider', () => {
         return result(
           [
             '... depotFile //depot/main/a.ts',
-            '... clientFile C:\\work\\a.ts',
+            '... clientFile //jinho_ws/a.ts',
             '... action edit',
             '... change default'
           ].join('\n')
@@ -153,11 +153,11 @@ describe('PerforceProvider', () => {
         return result(
           [
             '... depotFile //depot/main/default.ts',
-            '... clientFile C:\\work\\default.ts',
+            '... clientFile //ws/default.ts',
             '... action edit',
             '... change default',
             '... depotFile //depot/main/feature.ts',
-            '... clientFile C:\\work\\feature.ts',
+            '... clientFile //ws/feature.ts',
             '... action edit',
             '... change 123'
           ].join('\n')

@@ -1,4 +1,4 @@
-import { relative } from 'node:path'
+import { join, relative } from 'node:path'
 import { runProcess } from '../../shared/child-process/run-process'
 import type {
   PerforceChangelistsResult,
@@ -49,9 +49,19 @@ const defaultRun: PerforceRun = async (args, options) =>
 function entryFromRecord(
   record: TaggedRecord,
   root: string,
-  opened: boolean
+  opened: boolean,
+  info: PerforceInfoResult
 ): PerforceFileEntry | null {
-  const clientFile = record.clientFile || record.path
+  let clientFile = record.clientFile || record.path
+  const clientPrefix = info.client ? `//${info.client}/` : ''
+  if (
+    clientFile &&
+    info.clientRoot &&
+    clientPrefix &&
+    clientFile.toLocaleLowerCase().startsWith(clientPrefix.toLocaleLowerCase())
+  ) {
+    clientFile = join(info.clientRoot, ...clientFile.slice(clientPrefix.length).split('/'))
+  }
   if (!clientFile || !isPathInsideOrEqual(root, clientFile)) {
     return null
   }
@@ -123,11 +133,11 @@ export class PerforceProvider {
     const openedOutput = optionalPerforceStatusOutput(openedResult)
     const reconcileOutput = optionalPerforceStatusOutput(reconcileResult)
     const opened = parseP4TaggedOutput(openedOutput)
-      .map((record) => entryFromRecord(record, worktreePath, true))
+      .map((record) => entryFromRecord(record, worktreePath, true, info))
       .filter((entry): entry is PerforceFileEntry => entry !== null)
     const openedPaths = new Set(opened.map((entry) => entry.path.toLocaleLowerCase()))
     const unopened = parseP4TaggedOutput(reconcileOutput)
-      .map((record) => entryFromRecord(record, worktreePath, false))
+      .map((record) => entryFromRecord(record, worktreePath, false, info))
       .filter(
         (entry): entry is PerforceFileEntry =>
           entry !== null && !openedPaths.has(entry.path.toLocaleLowerCase())
