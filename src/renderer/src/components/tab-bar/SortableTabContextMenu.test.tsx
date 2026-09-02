@@ -210,10 +210,30 @@ describe('requestActiveTerminalPaneSplit', () => {
 })
 
 describe('SortableTabContextMenu', () => {
-  it('does not expose a native/terminal view switch', () => {
+  it('hides the view switch on tabs that cannot render chat', () => {
     const { container } = renderMenu()
 
     expect(container.textContent).not.toContain('Switch to terminal view')
+    expect(container.textContent).not.toContain('Switch to chat view')
+  })
+
+  it('switches an eligible tab between the chat and terminal views', () => {
+    const onToggleViewMode = vi.fn()
+    const { container } = renderMenu({ canToggleViewMode: true, onToggleViewMode })
+
+    act(() => getButton(container, 'Switch to chat view').click())
+
+    expect(onToggleViewMode).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers the way back to the terminal while the tab shows chat', () => {
+    const { container } = renderMenu({
+      canToggleViewMode: true,
+      isChatView: true,
+      onToggleViewMode: vi.fn()
+    })
+
+    expect(container.textContent).toContain('Switch to terminal view')
     expect(container.textContent).not.toContain('Switch to chat view')
   })
 
