@@ -20,10 +20,13 @@ import type { TerminalPaneMobileController } from './use-terminal-pane-mobile-ac
 export function useTerminalPaneProjection(controller: TerminalPaneMobileController) {
   const {
     applyNativeChatLeafRoute,
+    canToggleChatForLeaf,
     chatLeafId,
     chatPaneDispatchStatus,
     contextMenu,
     contextMenuLeafId,
+    effectiveChatViewMode,
+    getContextMenuLeafId,
     getNativeChatLeafIds,
     getTabWideAgentHintLeafId,
     isActive,
@@ -45,7 +48,8 @@ export function useTerminalPaneProjection(controller: TerminalPaneMobileControll
     tabAgentTypeByLeaf,
     terminalError,
     terminalErrorsByPaneId,
-    terminalTab
+    terminalTab,
+    toggleNativeChatForLeaf
   } = controller
   const effectiveAppearance = settings
     ? resolveEffectiveTerminalAppearance(settings, systemPrefersDark)
@@ -168,7 +172,28 @@ export function useTerminalPaneProjection(controller: TerminalPaneMobileControll
   const contextMenuCanContinueInNewSession = canContinueAgentSessionInNewSession(
     resolveAgentForLeaf(contextMenuLeafId)
   )
+  // Each toggle gates on its own leaf (header=active, menu=opened-over), so mixed splits show it only where chat can render.
+  const activePaneCanToggleChat = canToggleChatForLeaf(activePane?.leafId ?? null)
+  const contextMenuCanToggleChat = canToggleChatForLeaf(contextMenuLeafId)
+  const contextMenuIsChatView = effectiveChatViewMode && contextMenuLeafId === chatLeafId
+  const handleToggleNativeChat = (): void => {
+    const activeLeafId = managerRef.current?.getActivePane()?.leafId ?? null
+    if (activeLeafId) {
+      toggleNativeChatForLeaf(activeLeafId)
+    }
+  }
+  const handleContextMenuToggleNativeChat = (): void => {
+    const leafId = getContextMenuLeafId()
+    if (leafId) {
+      toggleNativeChatForLeaf(leafId)
+    }
+  }
   return {
+    activePaneCanToggleChat,
+    contextMenuCanToggleChat,
+    contextMenuIsChatView,
+    handleToggleNativeChat,
+    handleContextMenuToggleNativeChat,
     effectiveAppearance,
     terminalBackground,
     titleUsesLightSurface,
