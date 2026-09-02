@@ -77,6 +77,9 @@ function renderMenu(overrides: Record<string, unknown> = {}): string {
     canContinueAgentSessionInNewSession: false,
     onContinueAgentSessionInNewSession: vi.fn(),
     onForkAgentSession: vi.fn(),
+    canToggleNativeChat: false,
+    isNativeChatView: false,
+    onToggleNativeChat: vi.fn(),
     onCopyAgentSessionContext: vi.fn(),
     quickCommandHosts: [
       { hostId: 'local' as const, label: 'Local Linux', repoCommands: [], globalCommands: [] }
@@ -140,10 +143,27 @@ describe('TerminalContextMenu', () => {
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledTimes(1)
   })
 
-  it('does not expose a native/terminal view switch in the terminal menu', () => {
+  it('hides the view switch on panes that cannot render chat', () => {
     renderMenu()
 
     expect(items.list.some((item) => childrenText(item.children).includes('Switch to'))).toBe(false)
+  })
+
+  it('switches an eligible pane between the chat and terminal views', () => {
+    const onToggleNativeChat = vi.fn()
+    renderMenu({ canToggleNativeChat: true, onToggleNativeChat })
+
+    const toChat = items.list.find((item) =>
+      childrenText(item.children).includes('Switch to chat view')
+    )
+    expect(toChat).toBeDefined()
+    toChat?.onSelect?.()
+    expect(onToggleNativeChat).toHaveBeenCalledTimes(1)
+
+    renderMenu({ canToggleNativeChat: true, isNativeChatView: true, onToggleNativeChat })
+    expect(
+      items.list.some((item) => childrenText(item.children).includes('Switch to terminal view'))
+    ).toBe(true)
   })
 
   it('shows one shortcut per terminal menu action on Windows', () => {
