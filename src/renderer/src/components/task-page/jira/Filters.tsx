@@ -8,7 +8,7 @@ import { translate } from '@/i18n/i18n'
 import { LoaderCircle, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { shouldSuppressEnterSubmit } from '@/lib/new-workspace-enter-guard'
-import { TaskPageJiraSavedFilters } from './TaskPageJiraSavedFilters'
+import { TaskPageJiraSavedFilters } from '../../TaskPageJiraSavedFilters'
 export function TaskPageJiraFilters({
   model
 }: {
